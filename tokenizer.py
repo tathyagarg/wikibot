@@ -1,5 +1,8 @@
 import re
 
+def purify(text: list[str]) -> list[str]:
+    return [i.strip() for i in text if i.strip()]
+
 class Tokenizer:
     def __init__(self, text: str | list[str]) -> None:
         self.text: str = text
@@ -12,21 +15,23 @@ class Tokenizer:
         result = [sent.strip() for sent in result if sent.strip()]
         return result
     
-    def tokenize_word(self) -> list[str]:
-        result: list[str] = re.split(r'\s+', self.action_text)
-        return result
+    def tokenize_word(self, punctuation: bool = True) -> list[str]:
+        pattern: str = r'\s+' if punctuation else r'\W+'
 
-    def tokenize_word_sent(self) -> list[list[str]]:
+        result: list[str] = re.split(pattern, self.action_text)
+        return purify(result)
+
+    def tokenize_word_sent(self, punctuation: bool = True) -> list[list[str]]:
         result: list[str] = self.tokenize_sent()
-        result = [Tokenizer(sent).tokenize_word() for sent in result]
+        result = [Tokenizer(sent).tokenize_word(punctuation) for sent in result]
         return result
     
     def tokenize_punc_sent(self) -> list[list[str]]:
         result: list[str] = self.tokenize_sent()
         for (index, sent) in enumerate(result):
-            result[index] = [i.strip() for i in re.split(r'(\W)', sent) if i.strip()]
+            result[index] = purify(re.split(r'(\W)', sent))
         return result
 
     def tokenize_punc(self) -> list[str]:
-        result: list[str] = [i.strip() for i in re.split(r'(\W)', self.action_text) if i.strip()]
-        return result
+        result: list[str] = re.split(r'(\W)', self.action_text)
+        return purify(result)
