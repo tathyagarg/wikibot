@@ -94,8 +94,10 @@ class Lemmatizer:
             [a]   represents '<=1 instance of a'
             and the numbers correspond to the indexes in constants.POS
         (4/[7]{2{8}}0)1{3}(1/2/4/[7]{2{8}}0)[(2/4/[7]{2{8}}0)]{6(4/[7]{2{8}}0)1{3}(1/2/4/[7]{2{8}}0)[(1/2/4/[7]{2{8}}0)]}
-        In words,
-        (pronoun/[determiner]{adjective{particle}}noun)verb{adverb}(verb/adjective/pronoun/[determiner]{adjective{particle}}noun)(adjective/pronoun/[determiner]{adjective{particle}}noun){conjuction(pronoun/[determiner]{adjective{particle}}noun)verb{adverb}(verb/adjective/pronoun/[determiner]{adjective{particle}}noun)(adjective/pronoun/[determiner]{adjective{particle}}noun)}
+        In words, (\ represents only a continuation)
+        (pronoun/[determiner]{adjective{particle}}noun)verb{adverb}(verb/adjective/pronoun/[determiner]{adjective{particle}}noun) \
+        (adjective/pronoun/[determiner]{adjective{particle}}noun){conjuction(pronoun/[determiner]{adjective{particle}}noun)verb{adverb} \
+        (verb/adjective/pronoun/[determiner]{adjective{particle}}noun)(adjective/pronoun/[determiner]{adjective{particle}}noun)}
         """
 
         """ Check 1 - determiners """
