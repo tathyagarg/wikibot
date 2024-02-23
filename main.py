@@ -6,4 +6,4 @@ with open("corpus.txt", "r") as f:
 
 token_maker = tokens.Tokenizer(corpus)
 words = token_maker.tokenize_word_sent(False)
-print(lemma.Lemmatizer(words).extract_features())
+print(lemma.Lemmatizer(words).tag_part_of_speech(0))
