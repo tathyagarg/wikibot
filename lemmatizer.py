@@ -74,7 +74,7 @@ class Lemmatizer:
     def __init__(self, text: list[list[str]]) -> None:
         self.text = text
 
-    def classify(self, idx: int, sentence: list[dict], word: dict) -> tuple[tuple[str, consts.POS], int]:
+    def classify(self, idx: int, sentence: list[dict], word: dict, result: list[tuple[str, consts.POS]]) -> tuple[tuple[str, consts.POS], int]:
         """
         Function that classifies the given word into a part of speech.
         Return:
@@ -87,29 +87,24 @@ class Lemmatizer:
         @sentence: list[dict] - The sentence being parsed
         @word: dict - The features of the word being parsed
 
-        After some (very little) thinking, sentences observe to follow a pattern.
-        The pattern can be written in a notation where:
-            (a/b) represents 'a or b'
-            {a}   represents '>=0 instances of a'
-            [a]   represents '<=1 instance of a'
-            and the numbers correspond to the indexes in constants.POS
-        (4/[7]{2{8}}0)1{3}(1/2/4/[7]{2{8}}0)[(2/4/[7]{2{8}}0)]{6(4/[7]{2{8}}0)1{3}(1/2/4/[7]{2{8}}0)[(1/2/4/[7]{2{8}}0)]}
-        In words, (\ represents only a continuation)
-        (pronoun/[determiner]{adjective{particle}}noun)verb{adverb}(verb/adjective/pronoun/[determiner]{adjective{particle}}noun) \
-        (adjective/pronoun/[determiner]{adjective{particle}}noun){conjuction(pronoun/[determiner]{adjective{particle}}noun)verb{adverb} \
-        (verb/adjective/pronoun/[determiner]{adjective{particle}}noun)(adjective/pronoun/[determiner]{adjective{particle}}noun)}
+        English is too complex to make a pattern :(
         """
+        real_word = word['word']
 
-        """ Check 1 - determiners """
-        if word['word'].lower() in consts.DETERMINERS:
-            return (word['word'], consts.POS.DET), 0
+        for wordset, corro in consts.DIRECT:
+            if real_word.lower() in wordset:
+                result.append((real_word, corro))
+                return result, 0
+
+        preceding = result[-1]
+
+        # Verbs
+        if preceding[1] == consts.POS.PRON or preceding[1] == consts.POS.NOUN:
+            result.append((real_word, consts.POS.VERB))
+            return result, 0
         
-        """ Check 2 - pronouns """
-        if word['word'].lower() in consts.PRONOUNS:
-            return (word['word'], consts.POS.PRON), 0
-
         """
-            Check 3 - nouns and adjectvives
+            Nouns and Adjectives
 
             PART A: Adjectives
                 Check I: Preceding word is a determiner
@@ -126,27 +121,65 @@ class Lemmatizer:
                     2. The program then does the same steps as in Check I to find the adjectives.
 
             PART B: Nouns
-                TODO
+                Word before a verb?
         """
-        # TODO
+
+        if preceding[1] == consts.POS.ART or preceding[1] == consts.POS.POS:
+            if real_word in consts.NOUNS:
+                result.append((real_word, consts.POS.NOUN))
+                return result, 0
+            # else:
+            for index, new_word in enumerate(sentence[idx:], idx):
+                if new_word['word'] in consts.NOUNS:
+                    displacement = index-idx
+                    result.append((new_word['word'], consts.POS.NOUN))
+                    return result, displacement
+                else:
+                    result.append((new_word['word'], consts.POS.ADJ))
+
+        """
+            This works because if the sentence was:
+                He is a happy boy
+            The code would catch 'a' earlier when searching for articles
+            It only catches adverbs and adjectives
+            Wonder if we can catch adverbs earlier, though. Doubt it.
+        """
+        if preceding[1] == consts.POS.VERB:
+            if real_word in consts.ADVERBS:
+                result.append((real_word, consts.POS.ADV))
+                result.append((sentence[idx+1]['word'], consts.POS.ADJ))
+                return result, 1
+            else:
+                result.append((real_word, consts.POS.ADJ))
+                return result, 0
+
+        result.append((None, None))
+        return result, 0
 
 
     def tag_part_of_speech(self, sentence_idx: int = -1) -> list[list[tuple[str, consts.POS]]]:
         """
             The output of this function would be in the form:
             [ [ ( str, POS ) ] ]
+            Xue Hua Piao Piao Bei Feng Xiao Xiao
         """
         result = []
         target = self.extract_features(sentence_idx)
+        skip = 0
         if sentence_idx == -1:
             for sentence in target:
                 result.append([])
                 for idx, word in enumerate(sentence):
-                    result[-1].append(self.classify(idx, word))
+                    if skip > 0:
+                        skip -= 1
+                        continue
+                    result[-1], skip = self.classify(idx, sentence, word, result[-1])
         else:
             for idx, word in enumerate(target):
-                result.append(self.classify(idx, word))
-
+                if skip > 0:
+                    skip -= 1
+                    continue
+                result, skip = self.classify(idx, target, word, result)
         return result
     
     def extract_features(self, sentence_idx: int = -1) -> list[list[dict] | dict]:
