@@ -14,7 +14,7 @@ class Tokenizer:
         self.text: str = text
         
     def tokenize_word(self, punctuation: bool = True, sentence_idx: int = 0) -> list[str]:
-        pattern: str = r'\s+' if punctuation else r"[^\w']+"
+        pattern: str = r"(\w+(?:'\w+)?|[^\w\s])" if punctuation else r"[^\w']+"
 
         result: list[str] = re.split(pattern, self.text[sentence_idx])
         return purify(result)

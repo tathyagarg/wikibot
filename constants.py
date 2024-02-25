@@ -11,7 +11,8 @@ class POS(enum.Enum):
     CONJ = 6  # Conjunction
     PART = 7  # Particle
     ART = 8   # Article
-    POS = 9  # Possessive
+    POS = 9   # Possessive
+    PUNC = 10 # Punctuation
 
 class WordShape(enum.Enum):
     UPPER = 0
@@ -26,9 +27,11 @@ POSSESSIVES = ["my", "your", "his", "her", "its", "our", "their"]
 DEMONSTRATIVES = ["this", "that", "these", "those"]
 PRONOUNS = ["i", "me", "you", "he", "him", "she", "her", "it", "we", "us", "they", "them"]
 CONJUCTIONS = ["and", "but"]
-VERBS = ["am", "are", "is"]
+VERBS = ["am", "are", "is", "can"]
 NOUNS = ["food", "brother", "boy"]
 ADVERBS = ["not", "always"]
+INTERROGATIVE_ADV = ["how", "when", "where", "why"]
+PUNCTUATION = [".", ",", "?", "!"]
 
 DIRECT = [
     (ARTICLES, POS.ART),
