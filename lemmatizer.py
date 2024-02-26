@@ -1,5 +1,6 @@
 import constants as consts
 import structures as structs
+from collections import defaultdict
 
 
 def make_sentence(sentence: list[str]) -> structs.Sentence:
@@ -13,10 +14,134 @@ def make_sentence(sentence: list[str]) -> structs.Sentence:
             word_index += 1
     return structs.Sentence(append_item)
 
-
 class Lemmatizer:
+    MORPHOLOGICAL_SUBSTITUTIONS = {
+        consts.POS.NOUN: [
+            ("s", ""),
+            ("ses", "s"),
+            ("ves", "f"),
+            ("xes", "x"),
+            ("zes", "z"),
+            ("ches", "ch"),
+            ("shes", "sh"),
+            ("men", "man"),
+            ("ies", "y"),
+        ],
+        consts.POS.VERB: [
+            ("s", ""),
+            ("ies", "y"),
+            ("es", "e"),
+            ("es", ""),
+            ("ed", "e"),
+            ("ed", ""),
+            ("ing", "e"),
+            ("ing", ""),
+        ],
+        consts.POS.ADJ: [("er", ""), ("est", ""), ("er", "e"), ("est", "e")],
+        consts.POS.ADV: [],
+    }
+
     def __init__(self, text: list[list[str]]) -> None:
         self.text = text
+        self.exception_map: dict[consts.POS, dict[str, str]] = {}
+
+        # Defaults to set a key to an empty dict if it is not already present
+        self.lemma_pos_offset_map = defaultdict(dict)
+
+        self.FILEMAP = {
+            consts.POS.ADJ: "adj",
+            consts.POS.ADV: "adv",
+            consts.POS.NOUN: "noun",
+            consts.POS.VERB: "verb",
+            consts.POS.HELP: "verb"
+        }
+
+        self.LETTER_TO_POS = {
+            "a": consts.POS.ADJ,
+            "r": consts.POS.ADV,
+            "n": consts.POS.NOUN,
+            "v": consts.POS.VERB
+        }
+
+        self.load_exception_map()
+        self.load_lemma_pos_offset_map()
+
+    def open(self, fp: str):
+        with open(fp, "r") as f:
+            return list(map(str.rstrip, f.readlines()))
+
+    def load_exception_map(self) -> None:
+        for pos, text in self.FILEMAP.items():
+            self.exception_map[pos] = {}
+            for line in self.open(f"data/{text}.exc"):
+                terms = line.split()
+                self.exception_map[pos][terms[0]] = terms[1:]
+    
+    def load_lemma_pos_offset_map(self):
+        for suffix in self.FILEMAP.values():
+            for line in self.open(f"data/index.{suffix}"):
+                # Ignore comment
+                if line.startswith(" "):
+                    continue
+
+                _iter = iter(line.split())
+
+                def _next_token():
+                    return next(_iter)
+
+                lemma = _next_token()
+                pos = self.LETTER_TO_POS[_next_token()]
+                n_synsets = int(_next_token())
+                n_pointers = int(_next_token())
+                # Skip next tokens
+                [_next_token() for _ in range(n_pointers+2)]
+
+                synset_offsets = [int(_next_token()) for _ in range(n_synsets)]
+
+                self.lemma_pos_offset_map[lemma][pos] = synset_offsets
+    
+    def make_lemma(self, word: str, pos: consts.POS) -> str:
+        # The code here will be almost a 1-to-1 copy of the code form nltk.corpus.WordNetCorpusReader
+        # It will be modified to fit this environment
+        exceptions = self.exception_map[pos]
+        substitutions = self.MORPHOLOGICAL_SUBSTITUTIONS[pos]
+
+        def apply_rules(forms):
+            return [
+                form[:-len(old)] + new
+                for form in forms
+                for old, new in substitutions
+                if form.endswith(old)
+            ]
+
+        def filter_forms(forms):
+            result = []
+            seen = set()
+            for form in forms:
+                if form in self.lemma_pos_offset_map:
+                    if pos in self.lemma_pos_offset_map[form]:
+                        if form not in seen:
+                            result.append(form)
+                            seen.add(form)
+            return result
+
+        if word in exceptions:
+            return filter_forms([word] + exceptions[word])
+
+        forms = apply_rules([word])
+
+        results = filter_forms([word] + forms)
+        if results:
+            return results
+
+        while forms:
+            forms = apply_rules(forms)
+            results = filter_forms(forms)
+            if results:
+                return results
+
+        return []
+
 
     def classify(self, idx: int, sentence: structs.Sentence, word: structs.Word) -> int:
         """
@@ -34,11 +159,11 @@ class Lemmatizer:
         if isinstance(word, structs.Punctuation):
             word.pos = consts.POS.PUNC
             return 0
-        
+    
         real_word = word.word.lower()
 
         if word.index == 0 and real_word in consts.INTERROGATIVE_ADV:
-            word.pos = consts.POS.ADV
+            word.pos = consts.POS.INTR
             return 0
 
         for wordset, corro in consts.DIRECT:
@@ -47,32 +172,17 @@ class Lemmatizer:
                 return 0
 
         preceding = word.context[0]
+        proceding = word.context[1]
+
+        if real_word == "all" and proceding.word.lower() == "of":
+            word.pos = consts.POS.QUAN
+            proceding.pos = consts.POS.PREP
+            return 1
 
         # Verbs
-        if preceding.pos in (consts.POS.PRON, consts.POS.NOUN):
+        if preceding.pos in (consts.POS.PRON, consts.POS.NOUN, consts.POS.INTR):
             word.pos = consts.POS.VERB
             return 0
-        
-        """
-            Nouns and Adjectives
-
-            PART A: Adjectives
-                Check I: Preceding word is a determiner
-                        Example: The tasty, Italian food is ...
-                    1. When the program reaches 'tasty', it sees the previous word was a determiner.
-                    2. It skips ahead over the list until it finds the first noun.
-                    3. It then jumps back to tasty and counts the numbers of words from the determiner to the noun.
-                    4. If the number is 0, the current word is a noun! Free noun identification as a side effect.
-                    5. If the number is = 1, the current word is an adjective.
-                    6. If the number is >= 2, a few of the following words are adjectives too, which may include particles like 'of' in 'few of'.
-                Check II: Preceding word is a verb
-                        Example: He only eats tasty food.
-                    1. The program reaches 'tasty', and sees the preceding word is a verb.
-                    2. The program then does the same steps as in Check I to find the adjectives.
-
-            PART B: Nouns
-                Word before a verb?
-        """
 
         if preceding.pos in (consts.POS.POS, consts.POS.ART):
             if real_word in consts.NOUNS or word.capitalization:
@@ -97,48 +207,79 @@ class Lemmatizer:
             It only catches adverbs and adjectives
             Wonder if we can catch adverbs earlier, though. Doubt it.
         """
-        if preceding.pos == consts.POS.VERB:
+        if preceding.pos == consts.POS.HELP:
             if real_word in consts.ADVERBS:
                 word.pos = consts.POS.ADV
-                word.context[1].pos = consts.POS.ADJ
+                proceding.pos = consts.POS.VERB
                 return 1
             else:
-                word.pos = consts.POS.ADJ
+                word.pos = consts.POS.VERB
                 return 0
+            
 
+        if preceding.pos == consts.POS.VERB:
+            if real_word in consts.PREPOSITIONS:
+                word.pos = consts.POS.PREP
+                return 0
+            elif real_word in consts.ADVERBS:
+                word.pos = consts.POS.ADV
+                proceding.pos = consts.POS.ADJ
+                return 1
+            else:
+                if not proceding:
+                    word.pos = consts.POS.NOUN
+                    return 0
+                word.pos = consts.POS.ADJ
+                if proceding.word.lower() in consts.PREPOSITIONS:
+                    proceding.pos = consts.POS.PREP
+                return 1
+
+        print('='*30+f'Undetermined {word} on {sentence}'+'='*30)
         word.pos = "Undetermined"
         return 0
 
 
-    def tag_part_of_speech(self, sentence_idx: int = -1) -> list[list[tuple[str, consts.POS]]]:
+    def fetch_pos(self) -> list[list[tuple[str, consts.POS]]]:
         """
             The output of this function would be in the form:
             [ [ ( str, POS ) ] ]
             Xue Hua Piao Piao Bei Feng Xiao Xiao
         """
-        target = self.extract_features(sentence_idx)
+        target = self.extract_features()
         skip = 0
-        if sentence_idx == -1:
-            for sentence in target:
-                for idx, word in enumerate(sentence):
-                    if skip > 0:
-                        skip -= 1
-                        continue
-                    skip = self.classify(idx, sentence, word)
-        else:
-            for idx, word in enumerate(target):
+        for sentence in target:
+            for idx, word in enumerate(sentence):
                 if skip > 0:
                     skip -= 1
                     continue
-                skip = self.classify(idx, target, word)
+                skip = self.classify(idx, sentence, word)
+
+        # Post-classification
+        for sentence in target:
+            for word in sentence:
+                if word.pos == consts.POS.HELP: word.pos = consts.POS.VERB
+
         return target
     
-    def extract_features(self, sentence_idx: int = -1) -> structs.Sentence | list[structs.Sentence]:
-        result: list = []
-        if sentence_idx == -1:
-            # Disgusting O(n * m) time complexity, but I'm not going to think about it too hard.
-            for sentence in self.text:
-                result.append(make_sentence(sentence))
-        else:
-            result = make_sentence(self.text[sentence_idx])
+    def extract_features(self) -> structs.Sentence | list[structs.Sentence]:
+        result: list = [
+            make_sentence(sentence) for sentence in self.text
+        ]
         return result
+
+    def lemmatize(self) -> list[structs.WordShell] | list[list[structs.WordShell]]:
+        result = []
+        for sentence in self.fetch_pos():
+            result.append([])
+            for word in sentence:
+                if isinstance(word, structs.Punctuation):
+                    result[-1].append(word.symbol)
+                elif word.pos in (consts.POS.ADJ, consts.POS.ADV, consts.POS.VERB, consts.POS.NOUN):
+                    if (lemma := self.make_lemma(word.word, word.pos)):
+                        result[-1].extend(lemma)
+                    else:
+                        result[-1].append(word.word)
+                else:
+                    result[-1].append(word.word)
+        return result
+    

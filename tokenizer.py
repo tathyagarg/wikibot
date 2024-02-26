@@ -1,7 +1,7 @@
 import re
 
 def purify(text: list[str]) -> list[str]:
-    return [i.strip() for i in text if i.strip()]
+    return [i.strip() for i in text if i is not None and i.strip()]
 
 class Tokenizer:
     CONTRACTIONS = {
@@ -14,7 +14,7 @@ class Tokenizer:
         self.text: str = text
         
     def tokenize_word(self, punctuation: bool = True, sentence_idx: int = 0) -> list[str]:
-        pattern: str = r"(\w+(?:'\w+)?|[^\w\s])" if punctuation else r"[^\w']+"
+        pattern: str = r"([^\w\s'-]+)|(\s+)" if punctuation else r"[^\w']+"
 
         result: list[str] = re.split(pattern, self.text[sentence_idx])
         return purify(result)
@@ -38,7 +38,8 @@ class Tokenizer:
                     word.endswith("'m") or \
                     word.endswith("'re") or \
                     word.endswith("n't") or \
-                    word.endswith("'s")
+                    word.endswith("'s") or \
+                    word.endswith("'d")
                 ):
                     result[-1].append(word)
 
@@ -46,6 +47,8 @@ class Tokenizer:
                     result[-1].extend(["I", "am"])
                 if word.endswith("'re"):
                     result[-1].extend([word[:-3], "are"])
+                if word.endswith("'d"):
+                    result[-1].extend([word[:-2], "would"])
                 if word.endswith("n't"):
                     capitalize = word[0].isupper()
                     broken = Tokenizer.CONTRACTIONS[word]

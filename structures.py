@@ -1,5 +1,10 @@
 import constants as consts
 
+class WordShell:
+    def __init__(self, word: str, pos: consts.POS) -> None:
+        self.word = word
+        self.pos = pos
+
 class Word:
     def __init__(self, word: str, index: int, punc_index: int) -> None:
         self.word = word
