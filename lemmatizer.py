@@ -180,6 +180,7 @@ class Lemmatizer:
             return 1
 
         # Verbs
+        print(word)
         if preceding.pos in (consts.POS.PRON, consts.POS.NOUN, consts.POS.INTR):
             word.pos = consts.POS.VERB
             return 0
