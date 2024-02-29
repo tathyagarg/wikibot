@@ -180,7 +180,6 @@ class Lemmatizer:
             return 1
 
         # Verbs
-        print(word)
         if preceding.pos in (consts.POS.PRON, consts.POS.NOUN, consts.POS.INTR):
             word.pos = consts.POS.VERB
             return 0
@@ -262,25 +261,26 @@ class Lemmatizer:
 
         return target
     
-    def extract_features(self) -> structs.Sentence | list[structs.Sentence]:
+    def extract_features(self) -> list[structs.Sentence]:
         result: list = [
             make_sentence(sentence) for sentence in self.text
         ]
         return result
 
-    def lemmatize(self) -> list[structs.WordShell] | list[list[structs.WordShell]]:
+    def lemmatize(self) -> list[list[structs.WordShell]]:
         result = []
         for sentence in self.fetch_pos():
+            print(f"Sentence: {sentence}")
             result.append([])
             for word in sentence:
                 if isinstance(word, structs.Punctuation):
-                    result[-1].append(word.symbol)
+                    continue
                 elif word.pos in (consts.POS.ADJ, consts.POS.ADV, consts.POS.VERB, consts.POS.NOUN):
                     if (lemma := self.make_lemma(word.word, word.pos)):
-                        result[-1].extend(lemma)
+                        result[-1].extend(list(map(str.lower, lemma)))
                     else:
-                        result[-1].append(word.word)
+                        result[-1].append(word.word.lower())
                 else:
-                    result[-1].append(word.word)
+                    result[-1].append(word.word.lower())
         return result
     
