@@ -7,12 +7,10 @@ def make_sentence(sentence: list[str]) -> structs.Sentence:
     append_item = []
     word_index = 0
     for i, word in enumerate(sentence):
-        if word in consts.PUNCTUATION:
-            append_item.append(structs.Punctuation(word, i))
-        else:
-            append_item.append(structs.Word(word, word_index, i))
-            word_index += 1
-    return structs.Sentence(append_item)
+        append_item.append(structs.Word(word, word_index, i))
+        word_index += 1
+
+    return structs.Sentence(append_item)    
 
 class Lemmatizer:
     MORPHOLOGICAL_SUBSTITUTIONS = {
@@ -37,31 +35,57 @@ class Lemmatizer:
             ("ing", "e"),
             ("ing", ""),
         ],
-        consts.POS.ADJ: [("er", ""), ("est", ""), ("er", "e"), ("est", "e")],
-        consts.POS.ADV: [],
+        consts.POS.ADJECTIVE: [("er", ""), ("est", ""), ("er", "e"), ("est", "e")],
+        consts.POS.ADVERB: [],
     }
 
-    def __init__(self, text: list[list[str]]) -> None:
+    FILEMAP = {
+        consts.POS.ADJECTIVE: "adj",
+        consts.POS.ADVERB: "adv",
+        consts.POS.NOUN: "noun",
+        consts.POS.VERB: "verb"
+    }
+
+    LETTER_TO_POS = {
+        "a": consts.POS.ADJECTIVE,
+        "r": consts.POS.ADVERB,
+        "n": consts.POS.NOUN,
+        "v": consts.POS.VERB
+    }
+
+    STR_TO_POS = {
+        'CC': consts.POS.CONJUNCTION,
+        'CD': consts.POS.CARDINAL,
+        'DT': consts.POS.DETERMINER,
+        'EX': consts.POS.EXISTANCE_THERE,
+        'FW': consts.POS.FOREIGN,
+        'IN': consts.POS.PREPOSITION,
+        'JJ': consts.POS.ADJECTIVE, 'JJR': consts.POS.ADJECTIVE, 'JJS': consts.POS.ADJECTIVE,
+        'LS': consts.POS.LIST_MARKER,
+        'MD': consts.POS.MODAL,
+        'NN': consts.POS.NOUN, 'NNS': consts.POS.NOUN, 'NNP': consts.POS.NOUN, 'NNPS': consts.POS.NOUN,
+        'PDT': consts.POS.PREDETERMINER,
+        'POS': consts.POS.POSSESSIVE_ENDING,
+        'PRP': consts.POS.PRONOUN, 'PRP$': consts.POS.PRONOUN,
+        'RB': consts.POS.ADVERB, 'RBR': consts.POS.ADVERB, 'RBS': consts.POS.ADVERB,
+        'RP': consts.POS.PARTICLE,
+        'SYM': consts.POS.SYMBOL,
+        'TO': consts.POS.TO,
+        'UH': consts.POS.INTERJECTION,
+        'VB': consts.POS.VERB, 'VBD': consts.POS.VERB, 'VBG': consts.POS.VERB, 'VBN': consts.POS.VERB, 'VBP': consts.POS.VERB, 'VBZ': consts.POS.VERB,
+        'WDT': consts.POS.WH_DETERMINER,
+        'WP': consts.POS.WH_PRONOUN,
+        'WP$': consts.POS.POSSESSIVE_WH,
+        'WRB': consts.POS.WH_ADVERB
+    }
+
+    def __init__(self, text: list[list[str]], tagger) -> None:
         self.text = text
         self.exception_map: dict[consts.POS, dict[str, str]] = {}
+        self.tagger = tagger
 
         # Defaults to set a key to an empty dict if it is not already present
         self.lemma_pos_offset_map = defaultdict(dict)
-
-        self.FILEMAP = {
-            consts.POS.ADJ: "adj",
-            consts.POS.ADV: "adv",
-            consts.POS.NOUN: "noun",
-            consts.POS.VERB: "verb",
-            consts.POS.HELP: "verb"
-        }
-
-        self.LETTER_TO_POS = {
-            "a": consts.POS.ADJ,
-            "r": consts.POS.ADV,
-            "n": consts.POS.NOUN,
-            "v": consts.POS.VERB
-        }
 
         self.load_exception_map()
         self.load_lemma_pos_offset_map()
@@ -143,100 +167,13 @@ class Lemmatizer:
         return []
 
 
-    def classify(self, idx: int, sentence: structs.Sentence, word: structs.Word) -> int:
-        """
-        Function that classifies the given word into a part of speech.
-        Return:
-            int (a)
-        (a) - The number of iterations to skip
+    def classify(self, sentence: structs.Sentence) -> int:
+        tagged = self.tagger.tag(sentence)
+        result = []
+        for (word, pos) in tagged:
+            result.append((word, self.__class__.STR_TO_POS[pos]))
 
-        @idx: int - The current index
-        @sentence: list[dict] - The sentence being parsed
-        @word: dict - The features of the word being parsed
-
-        English is too complex to make a pattern :(
-        """
-        if isinstance(word, structs.Punctuation):
-            word.pos = consts.POS.PUNC
-            return 0
-    
-        real_word = word.word.lower()
-
-        if word.index == 0 and real_word in consts.INTERROGATIVE_ADV:
-            word.pos = consts.POS.INTR
-            return 0
-
-        for wordset, corro in consts.DIRECT:
-            if real_word in wordset:
-                word.pos = corro
-                return 0
-
-        preceding = word.context[0]
-        proceding = word.context[1]
-
-        if real_word == "all" and proceding.word.lower() == "of":
-            word.pos = consts.POS.QUAN
-            proceding.pos = consts.POS.PREP
-            return 1
-
-        # Verbs
-        if preceding.pos in (consts.POS.PRON, consts.POS.NOUN, consts.POS.INTR):
-            word.pos = consts.POS.VERB
-            return 0
-
-        if preceding.pos in (consts.POS.POS, consts.POS.ART):
-            if real_word in consts.NOUNS or word.capitalization:
-                # Checks if the word is a noun, or is capitalized ^^^^.
-                word.pos = consts.POS.NOUN
-                return 0
-            # else:
-            for index, new_word in enumerate(sentence[idx:], idx):
-                if isinstance(new_word, structs.Punctuation):
-                    new_word.pos = consts.POS.PUNC
-                elif new_word.word in consts.NOUNS:
-                    displacement = index-idx
-                    new_word.pos = consts.POS.NOUN
-                    return displacement
-                else:
-                    new_word.pos = consts.POS.ADJ
-
-        """
-            This works because if the sentence was:
-                He is a happy boy
-            The code would catch 'a' earlier when searching for articles
-            It only catches adverbs and adjectives
-            Wonder if we can catch adverbs earlier, though. Doubt it.
-        """
-        if preceding.pos == consts.POS.HELP:
-            if real_word in consts.ADVERBS:
-                word.pos = consts.POS.ADV
-                proceding.pos = consts.POS.VERB
-                return 1
-            else:
-                word.pos = consts.POS.VERB
-                return 0
-            
-
-        if preceding.pos == consts.POS.VERB:
-            if real_word in consts.PREPOSITIONS:
-                word.pos = consts.POS.PREP
-                return 0
-            elif real_word in consts.ADVERBS:
-                word.pos = consts.POS.ADV
-                proceding.pos = consts.POS.ADJ
-                return 1
-            else:
-                if not proceding:
-                    word.pos = consts.POS.NOUN
-                    return 0
-                word.pos = consts.POS.ADJ
-                if proceding.word.lower() in consts.PREPOSITIONS:
-                    proceding.pos = consts.POS.PREP
-                return 1
-
-        print('='*30+f'Undetermined {word} on {sentence}'+'='*30)
-        word.pos = "Undetermined"
-        return 0
+        return result
 
 
     def fetch_pos(self) -> list[list[tuple[str, consts.POS]]]:
@@ -245,22 +182,14 @@ class Lemmatizer:
             [ [ ( str, POS ) ] ]
             Xue Hua Piao Piao Bei Feng Xiao Xiao
         """
+        result = []
         target = self.extract_features()
-        skip = 0
         for sentence in target:
-            for idx, word in enumerate(sentence):
-                if skip > 0:
-                    skip -= 1
-                    continue
-                skip = self.classify(idx, sentence, word)
 
-        # Post-classification
-        for sentence in target:
-            for word in sentence:
-                if word.pos == consts.POS.HELP: word.pos = consts.POS.VERB
+            result.append(self.classify(sentence))
 
-        return target
-    
+        return result
+
     def extract_features(self) -> list[structs.Sentence]:
         result: list = [
             make_sentence(sentence) for sentence in self.text
@@ -269,18 +198,16 @@ class Lemmatizer:
 
     def lemmatize(self) -> list[list[structs.WordShell]]:
         result = []
-        for sentence in self.fetch_pos():
-            print(f"Sentence: {sentence}")
+        parts_of_speech = self.fetch_pos()
+        for sentence in parts_of_speech:
             result.append([])
             for word in sentence:
-                if isinstance(word, structs.Punctuation):
-                    continue
-                elif word.pos in (consts.POS.ADJ, consts.POS.ADV, consts.POS.VERB, consts.POS.NOUN):
-                    if (lemma := self.make_lemma(word.word, word.pos)):
+                if word[1] in (consts.POS.ADJECTIVE, consts.POS.ADVERB, consts.POS.VERB, consts.POS.NOUN):
+                    if (lemma := self.make_lemma(*word)):
                         result[-1].extend(list(map(str.lower, lemma)))
                     else:
-                        result[-1].append(word.word.lower())
+                        result[-1].append(word[0].lower())
                 else:
-                    result[-1].append(word.word.lower())
+                    result[-1].append(word[0].lower())
         return result
     

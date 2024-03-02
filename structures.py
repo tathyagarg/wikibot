@@ -61,6 +61,18 @@ class Word:
 
     def __repr__(self) -> str:
         return self.word
+    
+    def __getitem__(self, idx: slice | int):
+        return self.word[idx]
+    
+    def endswith(self, substring: str):
+        return self.word.endswith(substring)
+    
+    def lower(self):
+        return self.word.lower()
+    
+    def upper(self):
+        return self.word.upper()
 
 class Punctuation:
     def __init__(self, symbol: str, index: int) -> None:

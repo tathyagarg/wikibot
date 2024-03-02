@@ -24,10 +24,8 @@ def smooth(bigrams: dict[str, dict[str, int]]) -> dict[str, dict[str, float]]:
     for curr, next_words in bigrams.items():
         total = sum(next_words.values())
         smoothed_probs = {
-            word: count / (total+1) for word, count in next_words.items()
+            word: count / total for word, count in next_words.items()
         }
-
-        smoothed_probs['UNK'] = 1 / (total+1)
         bigrams[curr] = smoothed_probs
 
     return bigrams

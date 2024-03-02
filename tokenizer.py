@@ -13,14 +13,14 @@ class Tokenizer:
     def __init__(self, text: str | list[str]) -> None:
         self.text: str = text
         
-    def tokenize_word(self, punctuation: bool = True, sentence_idx: int = 0) -> list[str]:
-        pattern: str = r"([^\w\s'-]+)|(\s+)" if punctuation else r"[^\w']+"
+    def tokenize_word(self, sentence_idx: int = 0) -> list[str]:
+        pattern: str = r"[^\w']+"
 
         result: list[str] = re.split(pattern, self.text[sentence_idx])
         return purify(result)
 
-    def tokenize_word_sent(self, punctuation: bool = True) -> list[list[str]]:
-        result = [self.tokenize_word(punctuation, i) for i in range(len(self.text))]
+    def tokenize_word_sent(self) -> list[list[str]]:
+        result = [self.tokenize_word(i) for i in range(len(self.text))]
         return result
     
     def tokenize_punc_sent(self) -> list[list[str]]:

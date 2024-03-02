@@ -5,5 +5,9 @@ class TextGenerator:
         self.bigrams = bigrams
 
     def speak_word(self, start_on: str) -> str:
-        return random.choices(list(self.bigrams[start_on].keys()), weights=list(self.bigrams[start_on].values()), k=1)[0]        
+        return random.choices(
+            list(self.bigrams[start_on].keys()),
+            weights=list(self.bigrams[start_on].values()),
+            k=1
+        )[0]
 
