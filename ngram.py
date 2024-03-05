@@ -1,8 +1,10 @@
+import constants as consts
+
 class BigramMaker:
     def __init__(self, lemmas: list[str]) -> None:
         self.lemmas = lemmas
 
-        self.bigrams = {}
+        self.bigrams = consts.BigramsDict()
 
     def fetch_bigrams(self):
         for sentence in self.lemmas:

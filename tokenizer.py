@@ -1,4 +1,5 @@
 import re
+import constants as consts
 
 def purify(text: list[str]) -> list[str]:
     return [i.strip() for i in text if i is not None and i.strip()]
@@ -28,6 +29,16 @@ class Tokenizer:
         for (index, sent) in enumerate(result):
             result[index] = purify(re.split(r'(\W)', sent))
         return result
+    
+    def break_contractions_on(self, acting_on: consts.TokenizeType) -> list[str]:
+        if acting_on == consts.TokenizeType.WORD:
+            return self.break_contractions(self.tokenize_word())
+        
+        if acting_on == consts.TokenizeType.PUNC_SENT:
+            return self.break_contractions(self.tokenize_punc_sent())
+        
+        if acting_on == consts.TokenizeType.WORD_SENT:
+            return self.break_contractions(self.tokenize_word_sent())
 
     def break_contractions(self, tokenized) -> list[str]:
         result: list[list[str]] = []

@@ -1,16 +1,15 @@
 import constants as consts
-import structures as structs
 from collections import defaultdict
 
 
-def make_sentence(sentence: list[str]) -> structs.Sentence:
+def make_sentence(sentence: list[str]) -> consts.Sentence:
     append_item = []
     word_index = 0
     for i, word in enumerate(sentence):
-        append_item.append(structs.Word(word, word_index, i))
+        append_item.append(consts.Word(word, word_index, i))
         word_index += 1
 
-    return structs.Sentence(append_item)    
+    return consts.Sentence(append_item)    
 
 class Lemmatizer:
     MORPHOLOGICAL_SUBSTITUTIONS = {
@@ -185,12 +184,11 @@ class Lemmatizer:
         result = []
         target = self.extract_features()
         for sentence in target:
-
             result.append(self.classify(sentence))
 
         return result
 
-    def extract_features(self) -> list[structs.Sentence]:
+    def extract_features(self) -> list[consts.Sentence]:
         result: list = [
             make_sentence(sentence) for sentence in self.text
         ]
@@ -204,10 +202,10 @@ class Lemmatizer:
             for word in sentence:
                 if word[1] in (consts.POS.ADJECTIVE, consts.POS.ADVERB, consts.POS.VERB, consts.POS.NOUN):
                     if (lemma := self.make_lemma(*word)):
-                        result[-1].extend(list(map(str.lower, lemma)))
+                        result[-1].append(structs.WordShell(lemma[0], word[1]))
                     else:
-                        result[-1].append(word[0].lower())
+                        result[-1].append(structs.WordShell(word[0].lower(), word[1]))
                 else:
-                    result[-1].append(word[0].lower())
+                    result[-1].append(structs.WordShell(word[0].lower(), word[1]))
         return result
     
