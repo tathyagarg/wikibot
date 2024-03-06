@@ -14,14 +14,14 @@ class Tokenizer:
     def __init__(self, text: str | list[str]) -> None:
         self.text: str = text
         
-    def tokenize_word(self, sentence_idx: int = 0) -> list[str]:
-        pattern: str = r"[^\w']+"
+    def tokenize_word(self, sentence_idx: int = 0, punctaution: bool = False) -> list[str]:
+        pattern: str = r"[^\w']+" if not punctaution else r"\b[\w'-]+\b|\S"
 
-        result: list[str] = re.split(pattern, self.text[sentence_idx])
+        result: list[str] = re.findall(pattern, self.text[sentence_idx])
         return purify(result)
 
-    def tokenize_word_sent(self) -> list[list[str]]:
-        result = [self.tokenize_word(i) for i in range(len(self.text))]
+    def tokenize_word_sent(self, punctuation: bool = False) -> list[list[str]]:
+        result = [self.tokenize_word(i, punctaution=punctuation) for i in range(len(self.text))]
         return result
     
     def tokenize_punc_sent(self) -> list[list[str]]:
@@ -38,7 +38,7 @@ class Tokenizer:
             return self.break_contractions(self.tokenize_punc_sent())
         
         if acting_on == consts.TokenizeType.WORD_SENT:
-            return self.break_contractions(self.tokenize_word_sent())
+            return self.break_contractions(self.tokenize_word_sent(True))
 
     def break_contractions(self, tokenized) -> list[str]:
         result: list[list[str]] = []

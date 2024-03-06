@@ -1,4 +1,5 @@
 import enum
+import random
 
 # Parts of Speech
 class POS(enum.Enum):
@@ -26,7 +27,9 @@ class POS(enum.Enum):
     POSSESSIVE_WH = 21
     WH_ADVERB = 22
 
-    ANY = 23  # The forbidden tag
+    # The forbidden tag(s)
+    ANY = 23
+    PUNCTUATION = 24
 
     def __str__(self):
         return self.name
@@ -44,21 +47,124 @@ class TokenizeType(enum.Enum):
     PUNC_SENT = 1
     WORD_SENT = 2
 
-class BigramsDict(dict):
+STR_TO_POS = {
+    'CC': POS.CONJUNCTION,
+    'CD': POS.CARDINAL,
+    'DT': POS.DETERMINER,
+    'EX': POS.EXISTANCE_THERE,
+    'FW': POS.FOREIGN,
+    'IN': POS.PREPOSITION,
+    'JJ': POS.ADJECTIVE, 'JJR': POS.ADJECTIVE, 'JJS': POS.ADJECTIVE,
+    'LS': POS.LIST_MARKER,
+    'MD': POS.MODAL,
+    'NN': POS.NOUN, 'NNS': POS.NOUN, 'NNP': POS.NOUN, 'NNPS': POS.NOUN,
+    'PDT': POS.PREDETERMINER,
+    'POS': POS.POSSESSIVE_ENDING,
+    'PRP': POS.PRONOUN, 'PRP$': POS.PRONOUN,
+    'RB': POS.ADVERB, 'RBR': POS.ADVERB, 'RBS': POS.ADVERB,
+    'RP': POS.PARTICLE,
+    'SYM': POS.SYMBOL,
+    'TO': POS.TO,
+    'UH': POS.INTERJECTION,
+    'VB': POS.VERB, 'VBD': POS.VERB, 'VBG': POS.VERB, 'VBN': POS.VERB, 'VBP': POS.VERB, 'VBZ': POS.VERB,
+    'WDT': POS.WH_DETERMINER,
+    'WP': POS.WH_PRONOUN,
+    'WP$': POS.POSSESSIVE_WH,
+    'WRB': POS.WH_ADVERB,
+    'PUNC': POS.PUNCTUATION
+}
+
+class BigramsDict:
+    # Based off of a dict
+
+    @classmethod
+    def from_dict(cls, initializing_values: dict):
+        bigrams = cls()
+        bigrams.put_items(initializing_values, override=True)
+        return bigrams
+
+    def __init__(self) -> None:
+        self.__items = {}
+    
+    def items(self):
+        return self.__items.items()
+    
+    @property
+    def _items(self) -> list[tuple]:
+        return list(self.items())
+
+    def values(self):
+        return self.__items.values()
+    
+    @property
+    def _values(self) -> list:
+        return list(self.values())
+
+    def keys(self):
+        return self.__items.keys()
+
+    @property
+    def _keys(self):
+        return list(self.keys())
+
     def fetch_map(self, key):
         possibilities = [{obj.pos: val} for obj, val in self.items() if obj.word == key.word]
-        merged = {key: val for dic in possibilities for key, val in dic.items()}        
+        merged = {key: val for dic in possibilities for key, val in dic.items()}
 
         return merged
+    
+    def __setitem__(self, __key, __value):
+        self.__items[__key] = __value
 
     def __getitem__(self, __key):
         if __key.pos == POS.ANY:
             options = self.fetch_map(__key)
-            if not options: return ValueError("Cannot find word")
+            
+            # Guard clause
+            if not options:
+                raise KeyError("Cannot find word")
+
             return options
+        
+        for current_key, val in self.items():
+            if current_key == __key:
+                return val
+            
+        raise KeyError("Cannot find word")
+    
+    def __contains__(self, __key: object) -> bool:
+        try:
+            self.__getitem__(__key)
+            return True
+        except KeyError:
+            return False
 
-        return super().__getitem__(__key)
+    def get(self, __key: object, __default = None) -> object | None:
+        try:
+            value = self.__getitem__(__key)
+            return value
+        except KeyError:
+            return __default
 
+    def random_choice(self, **kwargs) -> tuple | object:
+        weight_values = kwargs.get('weight_values')
+        if weight_values:
+            # Use the values as weights
+            choices, weights = self._keys, self._values
+            return random.choices(choices, weights=weights, k=1)[0]
+
+        return random.choice(list(self.items()))
+
+    def __repr__(self) -> str:
+        # WOW!
+        return "BigramsDict{{{0}}}".format(', '.join(['{0}: {1}'.format(key, value) for key, value in self.items()]))
+
+    def put_items(self, vals: dict, **kwargs):
+        override = kwargs.get('override')
+        if override:
+            self.__items = vals
+        else:
+            self.__items.update(vals)
 
 def word_exists_in(word, target: dict):
     for key in target.keys():
@@ -88,6 +194,18 @@ class WordShell:
 
     def __repr__(self) -> str:
         return f"{self.word}({self.pos})"
+    
+    def __str__(self) -> str:
+        return self.word
+    
+    def lower(self):
+        return WordShell(self.word.lower(), self.pos)
+    
+    def upper(self):
+        return WordShell(self.word.upper(), self.pos)
+    
+    def title(self):
+        return WordShell(self.word.title(), self.pos)
     
 class Word:
     def __init__(self, word: str, index: int, punc_index: int) -> None:
@@ -143,12 +261,6 @@ class Word:
     
     def endswith(self, substring: str):
         return self.word.endswith(substring)
-    
-    def lower(self):
-        return self.word.lower()
-    
-    def upper(self):
-        return self.word.upper()
 
 class Punctuation:
     def __init__(self, symbol: str, index: int) -> None:
@@ -175,9 +287,47 @@ class Sentence:
         return iter(self.wordlist)
     
     def __repr__(self) -> str:
-        return f"[{', '.join(str(word) for word in self.wordlist)}]"
+        return f"[{', '.join([str(word) for word in self.wordlist])}]"
     
     def __getitem__(self, index: slice | int):
         if isinstance(index, slice):
             return self.wordlist[index.start:index.stop:index.step]
-        return self.wordlist[index:]
+        return self.wordlist[index]
+    
+    def __len__(self) -> int:
+        return len(self.wordlist)
+    
+    def fix_syntax(self):
+        """
+        Rules:
+            First word is capitalized
+        """
+        items = []
+        for i, word in enumerate(self.wordlist):
+            if i == 0: items.append(word.title())
+            else: items.append(word)
+
+        sent = Sentence(items)
+        return sent
+
+    def joint(self) -> str:
+        result = ''
+        for word in self.wordlist:
+            if word.pos != POS.PUNCTUATION:
+                result += f' {word.word}'
+            else:
+                result += word.word
+        
+        return result.strip()
+
+class CompleteSentence(Exception):
+    ...
+
+def make_sentences(words: list[list[str]], tagger) -> Sentence:
+    words = [[Word(i, -1, -1) for i in sent] for sent in words]
+    tagged = tagger.tag(words)
+
+    converted = [[WordShell(i.word, STR_TO_POS[pos]) for i, pos in sent] for sent in tagged]
+    sentences = [Sentence(sent) for sent in converted]
+    
+    return sentences

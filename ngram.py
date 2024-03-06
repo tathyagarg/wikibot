@@ -1,21 +1,22 @@
 import constants as consts
 
 class BigramMaker:
-    def __init__(self, lemmas: list[str]) -> None:
-        self.lemmas = lemmas
+    def __init__(self, words: list[str]) -> None:
+        self.words = words
 
         self.bigrams = consts.BigramsDict()
 
     def fetch_bigrams(self):
-        for sentence in self.lemmas:
+        for sentence in self.words:
             # Using len-1 so that we don't run into an error when accessing element i+1
             for i in range(len(sentence)-1):
-                curr = sentence[i]
+                curr = sentence[i].lower()
                 next_word = sentence[i+1]
                 if not self.bigrams.get(curr):
-                    self.bigrams[curr] = {}
+                    # Initializing subdict
+                    self.bigrams[curr] = consts.BigramsDict()
 
-                if not self.bigrams[curr].get(next_word):
+                if not self.bigrams.get(curr).get(next_word):
                     self.bigrams[curr][next_word] = 0
 
                 self.bigrams[curr][next_word] += 1
@@ -25,9 +26,9 @@ class BigramMaker:
 def smooth(bigrams: dict[str, dict[str, int]]) -> dict[str, dict[str, float]]:
     for curr, next_words in bigrams.items():
         total = sum(next_words.values())
-        smoothed_probs = {
+        smoothed_probs = consts.BigramsDict.from_dict({
             word: count / total for word, count in next_words.items()
-        }
+        })
         bigrams[curr] = smoothed_probs
 
     return bigrams

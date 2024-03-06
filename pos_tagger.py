@@ -3,10 +3,10 @@
 from collections import defaultdict
 import pickle
 import os
-import tokenizer as tknizer
 import constants as consts
+import string
 
-PICKLE = 'trontagger-0.1.0.pickle'
+PICKLE = 'data/trontagger-0.1.0.pickle'
 
 class Perceptron:
     def __init__(self):
@@ -65,8 +65,7 @@ class Tagger:
     END = ['-END-', '-END2-']
     AP_MODEL_LOC = os.path.join(os.path.dirname(__file__), PICKLE)
 
-    def __init__(self, tokenizer: tknizer.Tokenizer, load=True):
-        self.tokenizer = tokenizer
+    def __init__(self, load=True):
         self.model = Perceptron()
         self.tagdict = {}
         self.classes = set()
@@ -75,20 +74,22 @@ class Tagger:
 
     def tag(self, corpus):
         '''Tags a string `corpus`.'''
-        # Assume untokenized corpus has \n between sentences and ' ' between words
-        def split_sents(corpus):
-            yield corpus
 
         prev, prev2 = self.START
         tokens = []
-        for words in split_sents(corpus):
+        for words in corpus:
+            tokens.append([])
             context = self.START + [self._normalize(w) for w in words] + self.END
             for i, word in enumerate(words):
+                if word.word in string.punctuation:
+                    tokens[-1].append((word, "PUNC"))
+                    continue
+
                 tag = self.tagdict.get(word)
                 if not tag:
                     features = self._get_features(i, word, context, prev, prev2)
                     tag = self.model.predict(features)
-                tokens.append((word, tag))
+                tokens[-1].append((word, tag))
                 prev2 = prev
                 prev = tag
         return tokens
