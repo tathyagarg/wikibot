@@ -3,7 +3,7 @@
 from collections import defaultdict
 import pickle
 import os
-import constants as consts
+import utils
 import string
 
 PICKLE = 'data/trontagger-0.1.0.pickle'
@@ -107,9 +107,9 @@ class Tagger:
     def _normalize(self, word):
         if '-' in word.word and word.word[0] != '-':
             return '!HYPHEN'
-        elif word.shape == consts.WordShape.ONLY_DIGITS and len(word.word) == 4:
+        elif word.shape == utils.WordShape.ONLY_DIGITS and len(word.word) == 4:
             return '!YEAR'
-        elif word.shape == consts.WordShape.ONLY_DIGITS:
+        elif word.shape == utils.WordShape.ONLY_DIGITS:
             return '!DIGITS'
         else:
             return word.word.lower()

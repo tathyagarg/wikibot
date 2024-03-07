@@ -1,6 +1,9 @@
 import enum
 import random
 
+CONFIG_LOCATION = 'config.toml'
+CORPUS_LOCATION = 'corpus.txt'
+
 # Parts of Speech
 class POS(enum.Enum):
     CONJUNCTION = 0
