@@ -1,259 +1,118 @@
-import re
-import toml
-import utils
-import os
-from urllib.parse import urlparse, urlunparse, unquote
-from urllib3.util import parse_url
-from urllib3.poolmanager import proxy_from_url
-from base64 import b64encode
+import requests
+import time
+import bs4
+import urllib
+import urllib3
 
-def fetch_version() -> str:
-    with open(utils.CONFIG_LOCATION, 'r') as f:
-        config = toml.load(f)
-    return config['version']
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0'
 
-DEFAULT_HEADERS = {
-    'user-agent': f"wikibot/{fetch_version()}",
-    'accept-encoding': ", ".join(re.split(r',\s*', "gzip,deflate")),
-    'accept': "*/*",
-    'connection': 'keep-alive'
-}
 
-DEFAULT_HOOKS = {"response": []}
-REDIRECT_LIMIT = 10
-NETRC_LOC = '~/.netrc'  # location of .netrc
-WHITESPACES = '\n\t\r '
+def _req(term, results, lang, start, proxies, timeout):
+    resp = requests.get(
+        url="https://www.google.com/search",
+        headers={
+            "User-Agent": USER_AGENT
+        },
+        params={
+            "q": term,
+            "num": results + 2,  # Prevents multiple requests
+            "hl": lang,
+            "start": start,
+        },
+        proxies=proxies,
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    return resp
 
-class Lexer:
-    def __init__(self, fp) -> None:
-        self.fp = fp  # _io.TextIOWrapper
-        self.line = 1
-        self.priority_stack = []
 
-    def next_char(self):
-        char = self.fp.read(1)
-        if char == '\n':
-            self.line += 1
-        return char
-    
-    def fetch_token(self):
-        if self.priority_stack:
-            return self.priority_stack.pop()
-        
-        tok = ''
-        file_iterator = iter(self.next_char, sentinel='')
-        for character in file_iterator:
-            if character in WHITESPACES:
-                continue  # Skip
+class SearchResult:
+    def __init__(self, url, title, description):
+        self.url = url
+        self.title = title
+        self.description = description
 
-            if character in '"':
-                tok = self.append_to_token(file_iterator, tok)
-            else:
-                if character == '\\':  # We have an escape sequence
-                    character = self.next_char()
+    def __repr__(self):
+        return f"SearchResult(url={self.url}, title={self.title}, description={self.description})"
 
-                tok += character
-                tok = self.append_to_token(file_iterator, tok)
+class Scraper:
+    def __init__(self, query=None) -> None:
+        self.query = query
 
-            return tok
-                    
+    @property
+    def result(self):
+        return self.search(self.query)
 
-    def push_priority_stack(self, value):
-        self.priority_stack.append(value)
+    def search(self, term, num_results=10, lang="en", proxy=None, advanced=False, sleep_interval=0, timeout=5):
+        """Search the Google search engine"""
 
-    def append_to_token(self, file_iterator: iter, tok: str) -> str:
-        for character in file_iterator:
-            if character == '"':  # The double quotes instantly end
-                return tok
-            elif character == '\\':  # We have an escape sequence
-                character = self.next_char()
+        self.query = term
+        previously_yielded = []
+        escaped_term = urllib.parse.quote_plus(term)
 
-            tok += character  # Puts the character, next character if we're in an escape sequence (Eg. \n)
-
-        return tok
-
-def get_auth(url: str):
-    loc = os.path.expanduser(NETRC_LOC)
-    if not os.path.exists(loc): return
-
-    parse_res = urlparse(url)
-    split = b':'
-    host = parse_res.netloc.split(split)[0]
-
-    hosts = {}
-
-    with open(os.path.expanduser(NETRC_LOC), encoding='utf-8') as fp:
-        """
-        Example contents of .netrc:
-            machine host1.austin.century.com login fred password bluebonnet
-        """
-        lexer = Lexer(fp)
-        while True:
-            line_number: int = lexer.line
-            tok = lexer.fetch_token()
-
-            if not tok:  # Basically, tok == '', which we only get at the sentinel (end)
-                break
-            elif tok[0] == '#':
-                if lexer.line == line_number and len(tok) == 1:  # We got a hashtag character (comment)
-                    lexer.fp.readline()  # Skip the line
-                continue  # Next iteration
-            elif tok == 'machine':
-                entry = lexer.fetch_token()  # Next token
-            elif tok == 'default':
-                entry = 'default'
-            else:
-                raise LookupError("Invalid file contents")
-            
-            if not entry:
-                raise LookupError("Invalid file contents")
-
-            login = acc = password = ''
-            hosts[entry] = {}
-            while True:
-                prev_line_number: int = lexer.line
-                tok = lexer.fetch_token()
-                if tok.startswith('#'):
-                    if lexer.line == prev_line_number:
-                        lexer.fp.readline()
-                    continue
-                if tok in {'', 'machine', 'default'}:
-                    hosts[entry] = (login, acc, password)
-                    lexer.push_priority_stack(tok)
-                    break
-                elif tok in ('login', 'user'):
-                    login = lexer.fetch_token()
-                elif tok == 'account':
-                    acc = lexer.fetch_token()
-                elif tok == 'password':
-                    password = lexer.fetch_token()
-
-    if host in hosts:
-        ret = hosts[host]
-    elif 'default' in hosts:
-        ret = hosts['default']
-    else:
-        ret = None
-
-    if ret:
-        login = int(not ret[0])
-        return ret[login], ret[2]
-    else:
-        raise ValueError("ret not processed")
-
-def decode(text):
-    return text if isinstance(text, str) else text.decode("ascii")
-
-def select_proxy(url):
-    proxies = {}
-    parts = urlparse(url)
-    if parts.hostname is None:
-        return proxies.get(parts.scheme, proxies.get("all"))
-
-    proxy_keys = [
-        parts.scheme + "://" + parts.hostname,
-        parts.scheme,
-        "all://" + parts.hostname,
-        "all",
-    ]
-    proxy = None
-    for proxy_key in proxy_keys:
-        if proxy_key in proxies:
-            proxy = proxies[proxy_key]
-            break
-
-    return proxy
-
-def add_scheme_if_needed(url, new):
-        parsed = parse_url(url)
-        scheme, auth, _, _, path, query, fragment = parsed
-
-        netloc = parsed.netloc
-        if not netloc:
-            netloc, path = path, netloc
-
-        if auth:
-            netloc = "@".join([auth, netloc])
-        if scheme is None:
-            scheme = new
-        if path is None:
-            path = ""
-
-        return urlunparse((scheme, netloc, path, "", query, fragment))
-
-def proxy_headers(proxy):
-    headers = {}
-    auth = urlparse(proxy)
-    user, passw = unquote(auth.username), unquote(auth.password)
-
-    if user:
-        headers['proxy-authorization'] = "Basic " + decode(b64encode(b':'.join((user, passw))).strip())
-
-    return headers
-
-class Adapter:
-    def __init__(self) -> None:
-        self.proxy_manager = {}
-
-    def send(self, request):
-        conn = self.fetch_conn(request.url)
-
-    def fetch_conn(self, url):
-        proxy = select_proxy(url)
+        # Proxy
+        proxies = None
         if proxy:
-            proxy = add_scheme_if_needed(proxy, 'http')
-            url = parse_url(proxy)
-            manager = self.manager_for(proxy)
-            conn = manager.connection_from_url(url)
-        else:
-            # TODO
-            ...
+            if proxy.startswith("https"):
+                proxies = {"https": proxy}
+            else:
+                proxies = {"http": proxy}
 
-    def manager_for(self, proxy):
-        if proxy in self.proxy_manager:
-            return self.proxy_manager[proxy]
-        
-        headers = proxy_headers(proxy)
-        manager = self.proxy_manager[proxy] = proxy_from_url(
-            proxy,
-            proxy_headers=headers
-        )
-        return manager
+        # Fetch
+        start = 0
+        # while start < num_results:
+        # Send request
+        resp = _req(escaped_term, num_results - start,
+                    lang, start, proxies, timeout)
 
-class Request:
-    def __init__(self, url: str, headers: dict[str, str]) -> None:
-        self.url = url
-        self.headers = headers
+        # Parse
+        soup = bs4.BeautifulSoup(resp.text, "html.parser")
+        result_block = soup.find_all("div", attrs={"class": "g"})
+        if len(result_block) ==0:
+            start += 1
+        for result in result_block:
+            # Find link, title, description
+            link = result.find("a", href=True)
+            hostname = urllib3.util.parse_url(link['href']).hostname
 
-class RequestPrep:
-    def __init__(self, url: str, headers: dict[str, str], auth, hooks: dict):
-        self.url = url
-        self.headers = headers
-        self.auth = auth
-        self.hooks = hooks
+            title = result.find("h3")
+            description_box = result.find(
+                "div", {"style": "-webkit-line-clamp:2"})
+            if description_box:
+                description = description_box.text
+                if link and title and description:
+                    if hostname.count('.') == 1:
+                        if hostname in previously_yielded:
+                            continue
+                        else:
+                            previously_yielded.append(hostname)
+                    else:
+                        master = hostname.split('.', 1)[1]
+                        if master in previously_yielded:
+                            continue
+                        else:
+                            previously_yielded.append(master)
 
-        self.adapters = {}
-        self.add_adapter('http://', Adapter())
-        self.add_adapter('https://', Adapter())
+                    start += 1
+                    if advanced:
+                        yield SearchResult(link["href"], title.text, description)
+                    else:
+                        yield link["href"]
+        time.sleep(sleep_interval)
 
-    def add_adapter(self, prefix, adapter):
-        self.adapters[prefix] = adapter
+        if start == 0:
+            return []
+    
+    def content_search(self, term, num_results=10, lang='en', proxy=None, advanced=False, sleep_interval=0, timeout=5):
+        results = self.search(term, num_results=num_results, lang=lang, proxy=proxy, advanced=advanced, sleep_interval=sleep_interval, timeout=timeout)
+        items = [res for res in results]
 
-class Session:
-    def __init__(self) -> None:
-        self.headers = DEFAULT_HEADERS
-        self.hooks = DEFAULT_HOOKS
-        self.redirect_lim = REDIRECT_LIMIT
+        return items
 
-    def prepare(self, req: Request):
-        auth = get_auth(req.url)
-        return RequestPrep().prepare(
-            url=req.url,
-            headers=self.headers | req.headers,
-            auth=auth,
-            hooks=self.hooks
-        )
+def validity_check(elem):
+    return elem.text.strip()
 
-    def request(self, url: str):
-        req = Request(url=url, headers=DEFAULT_HEADERS)
-
+def text_from_html(contents, *, limit=10):
+    soup = bs4.BeautifulSoup(contents, 'html.parser')
+    texts = soup.find_all('p', class_=lambda cls: (cls != 'interlanguage-link-target'))
+    yield from list(filter(validity_check, texts))[:limit]
