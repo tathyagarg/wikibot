@@ -4,7 +4,6 @@ import text_gen
 import pos_tagger
 import utils
 import scraper
-import question_parser
 
 _scraper = scraper.Scraper()
 print(_scraper.fetch_results('ice-cream'))
