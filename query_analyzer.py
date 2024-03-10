@@ -1,20 +1,28 @@
 import numpy as np
 import utils
+import math
 
 DAMPING = utils.PROJECT.QUERY_ANALYZER['DAMPING']
 ALPHA = utils.PROJECT.QUERY_ANALYZER['ALPHA']
 LAMBDA = utils.PROJECT.QUERY_ANALYZER['LAMBDA']
 EPOCHS = utils.PROJECT.QUERY_ANALYZER['EPOCHS']
 
-class RecurrentNN:
-    def __init__(self, input_state, input_size, hidden_size, output_size, truth, activation=None, activation_deriv=None, output_activation=None) -> None:
-        self.input_state = input_state
+def magnitude(value):
+    return math.floor(math.log10(value))
+
+class RecurrentNeuralNetwork:
+    def __init__(self, input_size, hidden_size, output_size, *, activation=None, activation_deriv=None, output_activation=None) -> None:
+        self._input_state = []
+
         if activation_deriv and not activation or activation and not activation_deriv:
             raise KeyError("Must include both activation and activation_deriv")
         
+        self._truth = float('inf')
+        self.truth_magnitude = -1
+
         self.activation = activation or np.tanh
         self.activation_derivative = activation_deriv or (lambda v: 1/np.cosh(v)**2) # d(tanhx)/dx = sech^2(x)
-        self.output_activation = output_activation or (lambda v: np.round(100 * v))
+        self.output_activation = output_activation or (lambda v: np.round((10 ** self.truth_magnitude) * v))
         
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -32,10 +40,33 @@ class RecurrentNN:
             np.zeros(output_size)
         ]
 
+        self.hidden_state = None
+        self.output_state = None
+
+    def set_properties(self, input_state, truth):
+        self.input_state = input_state
+        self.truth = truth
+
         self.hidden_state = self.activation(np.dot(self.input_state, self.weights[0]) + self.biases[0])
         self.output_state = self.activation(np.dot(self.hidden_state, self.weights[2]) + self.biases[1])
 
-        self.truth = truth / 100
+
+    @property
+    def input_state(self):
+        return self._input_state
+    
+    @input_state.setter
+    def input_state(self, value):
+        self._input_state = value
+
+    @property
+    def truth(self):
+        return self._truth
+    
+    @truth.setter
+    def truth(self, value):
+        self.truth_magnitude = magnitude(value) + 1
+        self._truth = value / (10 ** self.truth_magnitude)
 
     def forward_pass(self):
         self.hidden_state = self.activation(np.dot(self.input_state, self.weights[0]) + np.dot(self.hidden_state, self.weights[1]) + self.biases[0])
@@ -90,3 +121,9 @@ class RecurrentNN:
     @property
     def activated_output(self):
         return self.output_activation(self.output_state)
+
+    def train(self, epochs=None):
+        epochs = epochs or EPOCHS
+        for _ in range(epochs):
+            self.forward_pass()
+            self.backward_passes()
