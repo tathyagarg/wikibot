@@ -1,0 +1,21 @@
+[project]
+name = "wikibot"
+version = "0.0.1"
+dependencies = [
+    "requests >= 2.31.0",
+    "toml >= 0.10.2",
+    "numpy >= 1.26.4",
+    "beautifulsoup4 >= 4.12.3"
+]
+requires-python = ">= 3.10"
+authors = [
+    { name = "Tathya Garg", email = "tathya.garg@gmail.com" }
+]
+
+description = "A chatbot that responds to your question by searching through wikis and constructing an answer."
+readme = {file = "README.md", content-type = "text/markdown"}
+license = { file = "LICENSE"}
+
+[project.urls]
+Homepage = "https://github.com/tathyagarg/wikibot"
+Repository = "https://github.com/tathyagarg/wikibot.git"

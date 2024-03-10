@@ -1,9 +1,10 @@
 import numpy as np
+import utils
 
-DAMPING = 1/100
-ALPHA = 1/1000
-LAMBDA = 1/100
-EPOCHS = 720
+DAMPING = utils.PROJECT.QUERY_ANALYZER['DAMPING']
+ALPHA = utils.PROJECT.QUERY_ANALYZER['ALPHA']
+LAMBDA = utils.PROJECT.QUERY_ANALYZER['LAMBDA']
+EPOCHS = utils.PROJECT.QUERY_ANALYZER['EPOCHS']
 
 class RecurrentNN:
     def __init__(self, input_state, input_size, hidden_size, output_size, truth, activation=None, activation_deriv=None, output_activation=None) -> None:

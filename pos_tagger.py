@@ -6,8 +6,6 @@ import os
 import utils
 import string
 
-PICKLE = 'data/trontagger-0.1.0.pickle'
-
 class Perceptron:
     def __init__(self):
         self.weights = {}
@@ -63,7 +61,7 @@ class Perceptron:
 class Tagger:
     START = ['-START-', '-START2-']
     END = ['-END-', '-END2-']
-    AP_MODEL_LOC = os.path.join(os.path.dirname(__file__), PICKLE)
+    AP_MODEL_LOC = os.path.join(os.path.dirname(__file__), utils.PROJECT.PERCEPTRON_TAGGER_TRAIN)
 
     def __init__(self, load=True):
         self.model = Perceptron()

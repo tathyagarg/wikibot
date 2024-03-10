@@ -1,8 +1,37 @@
 import enum
 import random
+import toml
 
-CONFIG_LOCATION = 'config.toml'
-CORPUS_LOCATION = 'corpus.txt'
+class Project:
+    def __init__(self) -> None:
+        self.POS_TAGGER = {
+            "PERCEPTRON_PICKLE": None
+        }
+
+        self.QUERY_ANALYZER = {
+            "DAMPING": None,
+            "ALPHA": None,
+            "LAMBDA": None,
+            "EPOCHS": None
+        }
+
+        self.data = [self.POS_TAGGER, self.QUERY_ANALYZER]
+
+    @property
+    def initialized(self):
+        for data in self.data:
+            if not all(list(data.values())): return False
+        return True
+
+with open(f'./config.toml') as f:
+    data = toml.load(f)
+
+    PROJECT = Project()
+    PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'] = data['pos-tagger']['PERCEPTRON_PICKLE']
+    PROJECT.QUERY_ANALYZER['DAMPING'] = data['query-analyzer']['DAMPING']
+    PROJECT.QUERY_ANALYZER['ALPHA'] = data['query-analyzer']['ALPHA']
+    PROJECT.QUERY_ANALYZER['LAMBDA'] = data['query-analyzer']['LAMBDA']
+    PROJECT.QUERY_ANALYZER['EPOCHS'] = data['query-analyzer']['EPOCHS']
 
 # Parts of Speech
 class POS(enum.Enum):
