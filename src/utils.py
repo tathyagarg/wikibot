@@ -30,7 +30,6 @@ with open(f'./config.toml') as f:
     PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'] = data['pos-tagger']['PERCEPTRON_PICKLE']
     PROJECT.QUERY_ANALYZER['DAMPING'] = data['query-analyzer']['DAMPING']
     PROJECT.QUERY_ANALYZER['ALPHA'] = data['query-analyzer']['ALPHA']
-    PROJECT.QUERY_ANALYZER['LAMBDA'] = data['query-analyzer']['LAMBDA']
     PROJECT.QUERY_ANALYZER['EPOCHS'] = data['query-analyzer']['EPOCHS']
 
 # Parts of Speech

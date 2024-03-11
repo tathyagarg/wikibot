@@ -1,14 +1,13 @@
 import numpy as np
-import utils
+import utils as utils
 import math
 
 DAMPING = utils.PROJECT.QUERY_ANALYZER['DAMPING']
 ALPHA = utils.PROJECT.QUERY_ANALYZER['ALPHA']
-LAMBDA = utils.PROJECT.QUERY_ANALYZER['LAMBDA']
 EPOCHS = utils.PROJECT.QUERY_ANALYZER['EPOCHS']
 
 def magnitude(value):
-    return math.floor(math.log10(value))
+    return math.floor(np.log10(value))
 
 class RecurrentNeuralNetwork:
     def __init__(self, input_size, hidden_size, output_size, *, activation=None, activation_deriv=None, output_activation=None) -> None:
@@ -32,7 +31,6 @@ class RecurrentNeuralNetwork:
             np.random.randn(input_size, hidden_size) * DAMPING,  # Input -> hidden
             np.random.randn(hidden_size, hidden_size) * DAMPING, # Hidden -> hidden
             np.random.randn(hidden_size, output_size) * DAMPING, # Hidden -> output
-            np.random.randn(output_size) * DAMPING               # Output -> [x]
         ]
 
         self.biases = [
@@ -65,12 +63,15 @@ class RecurrentNeuralNetwork:
     
     @truth.setter
     def truth(self, value):
-        self.truth_magnitude = magnitude(value) + 1
+        if value == 0:
+            self.truth_magnitude = 1
+        else:
+            self.truth_magnitude = magnitude(value) + 1
         self._truth = value / (10 ** self.truth_magnitude)
 
     def forward_pass(self):
         self.hidden_state = self.activation(np.dot(self.input_state, self.weights[0]) + np.dot(self.hidden_state, self.weights[1]) + self.biases[0])
-        self.output_state = self.activation(np.dot(self.hidden_state, self.weights[2]) + np.dot(self.output_state, self.weights[3]) + self.biases[1]) 
+        self.output_state = self.activation(np.dot(self.hidden_state, self.weights[2]) + self.biases[1]) 
 
     def backward_passes(self, *, inputs=None, epochs=5):
         dL_dW = np.zeros_like(self.weights[0])
@@ -89,11 +90,11 @@ class RecurrentNeuralNetwork:
                 b = self.biases[0]
                 c = self.biases[1]
 
-                z = np.dot(x, W) + b
+                z = np.dot(np.dot(x, W) + b, self.weights[1])
                 h = self.activation(z)
-                y_hat = (np.dot(h, U) + c)
+                y_hat = self.activation(np.dot(h, U) + c)
 
-                dL_dy_hat = 2 * (y_hat - y)
+                dL_dy_hat = 4 * (y_hat - y)
 
                 dL_dW += (dL_dy_hat * U * x  * self.activation_derivative(z).reshape((self.hidden_size,self.output_size))).reshape((self.input_size, self.hidden_size))
                 dL_dU += (dL_dy_hat * h).reshape((self.hidden_size, self.output_size))
@@ -109,14 +110,6 @@ class RecurrentNeuralNetwork:
         self.weights[2] -= ALPHA * dL_dU
         self.biases[0]  -= ALPHA * dL_db
         self.biases[1]  -= ALPHA * dL_dc
-
-    def loss(self):
-        mse_loss = (self.output_state[0] - self.truth) ** 2
-        W, U, b, c = self.weights[0], self.weights[2], self.biases[0], self.biases[1]
-
-        regularization_loss = 0.5 * LAMBDA * (np.sum(W**2) + np.sum(U**2) + np.sum(b**2) + np.sum(c**2))
-
-        return mse_loss + regularization_loss
     
     @property
     def activated_output(self):
@@ -127,3 +120,4 @@ class RecurrentNeuralNetwork:
         for _ in range(epochs):
             self.forward_pass()
             self.backward_passes()
+            print(f"{_} {self.activated_output=} {self.output_state}")
