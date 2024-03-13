@@ -354,11 +354,22 @@ class Sentence:
 class CompleteSentence(Exception):
     ...
 
+def make_words(words):
+    return [[Word(i, -1, -1) for i in sent] for sent in words]
+
+def convert_tagged(tagged_words):
+    return [[WordShell(i.word, STR_TO_POS[pos]) for i, pos in sent] for sent in tagged_words]
+
 def make_sentences(words: list[list[str]], tagger) -> Sentence:
-    words = [[Word(i, -1, -1) for i in sent] for sent in words]
+    words = make_words(words)
     tagged = tagger.tag(words)
 
-    converted = [[WordShell(i.word, STR_TO_POS[pos]) for i, pos in sent] for sent in tagged]
+    converted = convert_tagged(tagged)
     sentences = [Sentence(sent) for sent in converted]
     
     return sentences
+
+def topic_identifier(tagged):
+    for sent in tagged:
+        for word in sent:
+            print(f"{word!r}")

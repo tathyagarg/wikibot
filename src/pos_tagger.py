@@ -61,7 +61,7 @@ class Perceptron:
 class Tagger:
     START = ['-START-', '-START2-']
     END = ['-END-', '-END2-']
-    AP_MODEL_LOC = os.path.join(os.path.dirname(__file__), utils.PROJECT.PERCEPTRON_TAGGER_TRAIN)
+    AP_MODEL_LOC = os.path.join(os.path.dirname(__file__), utils.PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'])
 
     def __init__(self, load=True):
         self.model = Perceptron()
@@ -96,6 +96,7 @@ class Tagger:
         try:
             w_td_c = pickle.load(open(loc, 'rb'))
         except IOError:
+            print(os.getcwd())
             msg = ("Missing trontagger.pickle file.")
             raise FileNotFoundError(msg)
         self.model.weights, self.tagdict, self.classes = w_td_c

@@ -1,7 +1,2 @@
 [pos-tagger]
-PERCEPTRON_PICKLE = "./data/trontagger-0.1.0.pickle"
-
-[query-analyzer]
-DAMPING = 0.01
-ALPHA = 0.001
-EPOCHS = 2000
+PERCEPTRON_PICKLE = "../data/trontagger-0.1.0.pickle"

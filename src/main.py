@@ -5,8 +5,15 @@ import pos_tagger
 import utils
 import scraper
 
-_scraper = scraper.Scraper()
-print(_scraper.fetch_results('ice-cream'))
+tokens = tokenizer.Tokenizer(text=['What is ice-cream?']).break_contractions_on(utils.TokenizeType.WORD_SENT)
+tagged = utils.convert_tagged(pos_tagger.Tagger().tag(utils.make_words(tokens)))
+
+important = utils.topic_identifier(tagged)
+
+print(important)
+
+# _scraper = scraper.Scraper()
+# print(_scraper.fetch_results('ice-cream'))
 
 # tokens = tokenizer.Tokenizer(text=["What is ice-cream?"]).break_contractions_on(utils.TokenizeType.WORD_SENT)
 # tagger = pos_tagger.Tagger()
