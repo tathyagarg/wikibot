@@ -94,7 +94,8 @@ class Tagger:
 
     def load(self, loc):
         try:
-            w_td_c = pickle.load(open(loc, 'rb'))
+            with open(loc, 'rb') as f:
+                w_td_c = pickle.load(f)
         except IOError:
             print(os.getcwd())
             msg = ("Missing trontagger.pickle file.")

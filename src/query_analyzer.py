@@ -1,7 +1,9 @@
 import numpy as np
 import utils
 import math
-import data
+import warnings
+
+warnings.filterwarnings("error")
 
 DAMPING = utils.PROJECT.QUERY_ANALYZER['DAMPING']
 ALPHA = utils.PROJECT.QUERY_ANALYZER['ALPHA']
@@ -21,16 +23,16 @@ class RecurrentNeuralNetwork:
         self.truth_magnitude = 1
 
         self.activation = activation or np.tanh
-        self.activation_derivative = activation_deriv or (lambda v: 1/np.cosh(v)**2) # d(tanhx)/dx = sech^2(x)
+        self.activation_derivative = activation_deriv or (lambda v: 1/np.cosh(v)**1/2) # d(tanhx)/dx = sech^2(x)
         self.output_activation = output_activation or (lambda v, t: np.round((10 ** t) * v))
         
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
 
-        self.W = np.random.randn(input_size, hidden_size) * DAMPING,  # Input -> hidden
-        self.V = np.random.randn(hidden_size, hidden_size) * DAMPING, # Hidden -> hidden
-        self.U = np.random.randn(hidden_size, output_size) * DAMPING, # Hidden -> output
+        self.W = np.random.randn(input_size, hidden_size) * DAMPING  # Input -> hidden
+        self.V = np.random.randn(hidden_size, hidden_size) * DAMPING # Hidden -> hidden
+        self.U = np.random.randn(hidden_size, output_size) * DAMPING # Hidden -> output
 
 
         self.b = np.random.randn(hidden_size)
@@ -80,7 +82,7 @@ class RecurrentNeuralNetwork:
 
                 dY = 2 * (y_hat - y)  # This is equal to \frac{\partial{(y - \hat{y})^2}}{\partial{\theta}} / \frac{\partial{(y - \hat(y))}}{\partial{\theta}} (in LaTeX)
 
-                dW += (dY * U * self.activation_derivative(z).reshape((self.hidden_size, self.output_size)) * x).reshape((self.input_size, self.hidden_size))
+                dW += (dY * U * self.activation_derivative(z).reshape((self.hidden_size, self.output_size)) * x).T
                 dU += (dY * z).reshape((self.hidden_size, self.output_size))
                 db += (dY * self.activation_derivative(z).reshape((self.hidden_size, self.output_size)) * U).reshape((self.hidden_size))
                 dc += dY.reshape((self.output_size))

@@ -7,13 +7,15 @@ import scraper
 import query_analyzer
 import data
 
-tokens = tokenizer.Tokenizer(text=['What is ice-cream 2']).break_contractions_on(utils.TokenizeType.WORD_SENT)
+tokens = tokenizer.Tokenizer(text=['What is ice-cream']).break_contractions_on(utils.TokenizeType.WORD_SENT)
 
 tagged = utils.convert_tagged(pos_tagger.Tagger().tag(utils.make_words(tokens)))
 pos_only = [[word.pos.value for word in sent] for sent in tagged]
 
+print(tagged)
+
 analyzer = query_analyzer.RecurrentNeuralNetwork(10, 12, 1)
-analyzer.train_on(data.DATA, min_time=0.5)
+analyzer.train_on(data.DATA, min_time=0.25)
 
 for sent in pos_only:
     sent = utils.pad(sent, padding_character=-1, length=10)

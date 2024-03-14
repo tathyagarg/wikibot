@@ -412,7 +412,7 @@ class Bar:
             if self.time == -1:
                 self.start_time = curr
                 self.time = curr
-            elif curr - self.time < self.min_time:
+            elif (curr - self.time) < self.min_time:
                 yield item
                 continue
             else:
@@ -430,7 +430,7 @@ class Bar:
                 print('Training complete 100%')
                 return
 
-def pad(tag_only, padding_character, length):
+def pad(tag_only, padding_character=-1, length=10):
     null_count = [padding_character] * (length-len(tag_only))
     return tag_only + null_count
 
