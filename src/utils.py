@@ -1,6 +1,7 @@
 import enum
 import random
 import toml
+import time
 
 class Project:
     def __init__(self) -> None:
@@ -15,7 +16,12 @@ class Project:
             "EPOCHS": None
         }
 
-        self.data = [self.POS_TAGGER, self.QUERY_ANALYZER]
+        self.UTILS = {
+            "HASH_CHARACTER": None,
+            "SPACE_CHARACTER": None
+        }
+
+        self.data = [self.POS_TAGGER, self.QUERY_ANALYZER, self.UTILS]
 
     @property
     def initialized(self):
@@ -31,6 +37,8 @@ with open(f'./config.toml') as f:
     PROJECT.QUERY_ANALYZER['DAMPING'] = data['query-analyzer']['DAMPING']
     PROJECT.QUERY_ANALYZER['ALPHA'] = data['query-analyzer']['ALPHA']
     PROJECT.QUERY_ANALYZER['EPOCHS'] = data['query-analyzer']['EPOCHS']
+    PROJECT.UTILS['HASH_CHARACTER'] = data['utils']['HASH_CHARACTER']
+    PROJECT.UTILS['SPACE_CHARACTER'] = data['utils']['SPACE_CHARACTER']
 
 # Parts of Speech
 class POS(enum.Enum):
@@ -63,6 +71,9 @@ class POS(enum.Enum):
     PUNCTUATION = 24
 
     def __str__(self):
+        return self.name
+    
+    def __repr__(self):
         return self.name
 
 class WordShape(enum.Enum):
@@ -369,7 +380,57 @@ def make_sentences(words: list[list[str]], tagger) -> Sentence:
     
     return sentences
 
-def topic_identifier(tagged):
-    for sent in tagged:
-        for word in sent:
-            print(f"{word!r}")
+class Bar:
+    def __init__(self, rng, *, min_time=0.001, length=20, hash_character=PROJECT.UTILS["HASH_CHARACTER"], space_character=PROJECT.UTILS["SPACE_CHARACTER"]) -> None:
+        self.rng = rng
+
+        self.start_time = -1
+        self.time = -1
+        self.min_time = min_time
+        self.length = length
+
+        self.maximum = self.rng.stop-self.rng.step
+        self.thresh = round(self.maximum / self.length)
+
+        self.hash_character = hash_character
+        self.space_character = space_character
+
+    def render(self, item):
+        if item == -1:
+            hash_count = self.length
+            space_count = 0
+            item = self.maximum
+        else:
+            hash_count = item // self.thresh
+            space_count = self.length - hash_count
+
+        return '[' + self.hash_character*hash_count + self.space_character*space_count + f'] {item/self.maximum * 100:.2f}% ({item}/{self.maximum}) of Training epochs'
+    
+    def iterations(self):
+        for item in self.rng:
+            curr = time.time()
+            if self.time == -1:
+                self.start_time = curr
+                self.time = curr
+            elif curr - self.time < self.min_time:
+                yield item
+                continue
+            else:
+                self.time = curr
+            print(self.render(item), end='\r')
+            yield item
+
+    def __iter__(self):
+        iterator = self.iterations()
+        while True:
+            try:
+                yield next(iterator)
+            except StopIteration:
+                print(self.render(-1))
+                print('Training complete 100%')
+                return
+
+def pad(tag_only, padding_character, length):
+    null_count = [padding_character] * (length-len(tag_only))
+    return tag_only + null_count
+

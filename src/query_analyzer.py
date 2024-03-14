@@ -1,5 +1,5 @@
 import numpy as np
-import utils as utils
+import utils
 import math
 import data
 
@@ -89,47 +89,14 @@ class RecurrentNeuralNetwork:
             self.U -= ALPHA * (dU / length)
             self.b -= ALPHA * (db / length)
             self.c -= ALPHA * (dc / length)
-
-#        print(f"{dL_dW = }\n\n{dL_dU = }\n\n{dL_db = }\n\n{dL_dc = }")
-        
-    def loss(self, y_hat, y):
-        return (y - y_hat) ** 2
-
-    def gradient_check(self, theta):
-        epsilon = 0.1
-        if isinstance(theta[0], list):
-            ei = [1]+[0]*(len(theta[0])-1)
-        else:
-            ei = [1]+[0]*(len(theta)-1)
-        for thetai in theta:
-            if isinstance(thetai, (list, np.ndarray)):
-                for thetaij in thetai:
-                    thetaij_plus = thetaij + np.dot(ei, epsilon)
-                    thetaij_minus = thetaij - np.dot(ei, epsilon)
-                    difference = self.loss(thetaij_plus, thetaij) - self.loss(thetaij_minus, thetaij)
-                    print(f"{difference/(2 * epsilon) = }")
-            else:
-                thetai_plus = thetai + np.dot(ei, epsilon)
-                thetai_minus = thetai - np.dot(ei, epsilon)
-                difference = self.loss(thetai_plus, thetai) - self.loss(thetai_minus, thetai)
-                print(difference)
-
-                ei = ei[-1:] + ei[:-1]
     
     @property
     def activated_output(self):
         self.forward_pass()
         return self.output_activation(self.output_state)
 
-    def train(self, *, epochs=None):
-        epochs = epochs or EPOCHS
-        for _ in range(epochs):
-            self.backward_passes()
-
-    def train_on(self, dataset, *, epochs=None):
-        epochs = epochs or EPOCHS
-        for _ in range(epochs):
-            print(f"Training on {_}th")
+    def train_on(self, dataset, *, epochs=EPOCHS, min_time=1.5, bar_length=100):
+        for _ in utils.Bar(range(epochs), min_time=min_time, length=bar_length):
             self.backward_passes(inputs=dataset)
 
     def forward_pass(self):
@@ -145,10 +112,3 @@ class RecurrentNeuralNetwork:
         self.hidden_state = None
         self.forward_pass()
         return self.output_activation(self.output_state, 1)
-
-analyzer = RecurrentNeuralNetwork(5, 10, 1)
-analyzer.train_on(data.DATA)
-for i in range(10):
-    result = analyzer.predict(data.DATA[2*i][0])
-
-    print(f"{result = }\n\n{data.DATA[2*i][1] = }")
