@@ -1,13 +1,14 @@
 import numpy as np
 import utils
 import math
-import warnings
+import data
 
-warnings.filterwarnings("error")
+analyzer_env = utils.PROJECT.QUERY_ANALYZER
 
-DAMPING = utils.PROJECT.QUERY_ANALYZER['DAMPING']
-ALPHA = utils.PROJECT.QUERY_ANALYZER['ALPHA']
-EPOCHS = utils.PROJECT.QUERY_ANALYZER['EPOCHS']
+DAMPING = analyzer_env['DAMPING']
+ALPHA = analyzer_env['ALPHA']
+EPOCHS = analyzer_env['EPOCHS']
+TESTING_THRESHOLD = analyzer_env['TESTING_THRESHOLD']
 
 def magnitude(value):
     return math.floor(np.log10(value))
@@ -24,7 +25,7 @@ class RecurrentNeuralNetwork:
 
         self.activation = activation or np.tanh
         self.activation_derivative = activation_deriv or (lambda v: 1/np.cosh(v)**1/2) # d(tanhx)/dx = sech^2(x)
-        self.output_activation = output_activation or (lambda v, t: np.round((10 ** t) * v))
+        self.output_activation = output_activation or (lambda v: np.round(10 * v))
         
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -78,7 +79,7 @@ class RecurrentNeuralNetwork:
             for x, y in inputs:
                 z = np.dot(x, W) + b
                 h = self.activation(z)
-                y_hat = self.output_activation(np.dot(h, U) + c, 1)
+                y_hat = self.output_activation(np.dot(h, U) + c)
 
                 dY = 2 * (y_hat - y)  # This is equal to \frac{\partial{(y - \hat{y})^2}}{\partial{\theta}} / \frac{\partial{(y - \hat(y))}}{\partial{\theta}} (in LaTeX)
 
@@ -94,11 +95,14 @@ class RecurrentNeuralNetwork:
     
     @property
     def activated_output(self):
-        self.forward_pass()
+        self.output_state = np.dot(self.activation(
+            np.dot(self.input_state, self.W) + self.b
+        ), self.U) + self.c
+
         return self.output_activation(self.output_state)
 
     def train_on(self, dataset, *, epochs=EPOCHS, min_time=1.5, bar_length=100):
-        for _ in utils.Bar(range(epochs), min_time=min_time, length=bar_length):
+        for _ in utils.Bar(range(epochs), 'training epochs', 'Training complete.', min_time=min_time, length=bar_length):
             self.backward_passes(inputs=dataset)
 
     def forward_pass(self):
@@ -111,6 +115,42 @@ class RecurrentNeuralNetwork:
 
     def predict(self, inputs):
         self.input_state = inputs
-        self.hidden_state = None
-        self.forward_pass()
-        return self.output_activation(self.output_state, 1)
+        return self.activated_output[0]
+    
+    def test(self, dataset=None):
+        dataset = dataset or data.DATA
+        results = []
+        for inp, out in dataset:
+            real = self.predict(inp)
+            results.append(real == out)
+        
+        accuracy = sum(results)/len(dataset)
+        return accuracy
+    
+    def train_test(self, train_on, test_on, *, threshold=TESTING_THRESHOLD, epochs=EPOCHS, min_time=1.5, bar_length=100):
+        accuracy = 0
+        while accuracy < threshold:
+            self.train_on(train_on, epochs=epochs, min_time=min_time, bar_length=bar_length)
+            accuracy = self.test(test_on)
+            print(f"Accuracy: {accuracy*100:.2f}%")
+            if accuracy < threshold:
+                print("Retraining.")
+
+def interpret_prediction(prediction, sentence):
+    primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+    results = []
+    while prediction != 1:
+        for i, prime in enumerate(primes):
+            if prediction % prime == 0:
+                results.append(i)
+                prediction //= prime
+            
+            if prediction == 1:
+                break
+    try:
+        if len(results) == 1:
+            return sentence[results[0]]
+        elif len(results) == 2:
+            return sentence[results[0]:results[1]]
+    except IndexError:
+        return -1 # Error

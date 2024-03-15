@@ -9,3 +9,4 @@ PERCEPTRON_PICKLE = "../data/trontagger-0.1.0.pickle"
 DAMPING = 0.01
 ALPHA = 0.001
 EPOCHS = 1000
+TESTING_THRESHOLD = 0.9

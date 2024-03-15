@@ -1,5 +1,6 @@
 import requests
 import bs4
+import utils
 
 def columbia_encyclopedia(host_scheme, query, *, limit=1):
     def loose_search():
@@ -56,8 +57,8 @@ class Scraper:
 
     def fetch_results(self, query, *, limit=1):
         results = []
-        for scraper in self.scrapers:
-            for result in scraper.fetch(query, limit=limit):
+        for scraper_idx in utils.Bar(range(len(self.scrapers)), 'sites searched', 'Searching complete.'):
+            for result in self.scrapers[scraper_idx].fetch(query, limit=limit):
                 results.append(result)
 
         return results

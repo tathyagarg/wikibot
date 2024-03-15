@@ -12,8 +12,8 @@ class Project:
         self.QUERY_ANALYZER = {
             "DAMPING": None,
             "ALPHA": None,
-            "LAMBDA": None,
-            "EPOCHS": None
+            "EPOCHS": None,
+            "TESTING_THRESHOLD": None
         }
 
         self.UTILS = {
@@ -34,9 +34,12 @@ with open(f'./config.toml') as f:
 
     PROJECT = Project()
     PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'] = data['pos-tagger']['PERCEPTRON_PICKLE']
+    
     PROJECT.QUERY_ANALYZER['DAMPING'] = data['query-analyzer']['DAMPING']
     PROJECT.QUERY_ANALYZER['ALPHA'] = data['query-analyzer']['ALPHA']
     PROJECT.QUERY_ANALYZER['EPOCHS'] = data['query-analyzer']['EPOCHS']
+    PROJECT.QUERY_ANALYZER['TESTING_THRESHOLD'] = data['query-analyzer']['TESTING_THRESHOLD']
+    
     PROJECT.UTILS['HASH_CHARACTER'] = data['utils']['HASH_CHARACTER']
     PROJECT.UTILS['SPACE_CHARACTER'] = data['utils']['SPACE_CHARACTER']
 
@@ -381,7 +384,8 @@ def make_sentences(words: list[list[str]], tagger) -> Sentence:
     return sentences
 
 class Bar:
-    def __init__(self, rng, *, min_time=0.001, length=20, hash_character=PROJECT.UTILS["HASH_CHARACTER"], space_character=PROJECT.UTILS["SPACE_CHARACTER"]) -> None:
+    def __init__(self, rng, final_msg, exit_msg, *, min_time=0.001, length=100, hash_character=PROJECT.UTILS["HASH_CHARACTER"], space_character=PROJECT.UTILS["SPACE_CHARACTER"]) -> None:
+        if isinstance(rng, list): rng = range(len(rng)+1)
         self.rng = rng
 
         self.start_time = -1
@@ -389,11 +393,14 @@ class Bar:
         self.min_time = min_time
         self.length = length
 
-        self.maximum = self.rng.stop-self.rng.step
-        self.thresh = round(self.maximum / self.length)
+        self.maximum = self.rng.stop
+        self.thresh = self.maximum / self.length
 
         self.hash_character = hash_character
         self.space_character = space_character
+
+        self.final_message = final_msg
+        self.exit_message = exit_msg
 
     def render(self, item):
         if item == -1:
@@ -401,10 +408,10 @@ class Bar:
             space_count = 0
             item = self.maximum
         else:
-            hash_count = item // self.thresh
+            hash_count = int(item // self.thresh)
             space_count = self.length - hash_count
 
-        return '[' + self.hash_character*hash_count + self.space_character*space_count + f'] {item/self.maximum * 100:.2f}% ({item}/{self.maximum}) of Training epochs'
+        return '[' + self.hash_character*hash_count + self.space_character*space_count + f'] {item/self.maximum * 100:.2f}% ({item}/{self.maximum}) {self.final_message}'
     
     def iterations(self):
         for item in self.rng:
@@ -427,7 +434,7 @@ class Bar:
                 yield next(iterator)
             except StopIteration:
                 print(self.render(-1))
-                print('Training complete 100%')
+                print(self.exit_message)
                 return
 
 def pad(tag_only, padding_character=-1, length=10):

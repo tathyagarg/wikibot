@@ -12,15 +12,17 @@ tokens = tokenizer.Tokenizer(text=['What is ice-cream']).break_contractions_on(u
 tagged = utils.convert_tagged(pos_tagger.Tagger().tag(utils.make_words(tokens)))
 pos_only = [[word.pos.value for word in sent] for sent in tagged]
 
-print(tagged)
+info_fetcher = scraper.Scraper()
 
 analyzer = query_analyzer.RecurrentNeuralNetwork(10, 12, 1)
-analyzer.train_on(data.DATA, min_time=0.25)
+analyzer.train_test(data.DATA, data.DATA, min_time=0.75, epochs=2500)
 
-for sent in pos_only:
-    sent = utils.pad(sent, padding_character=-1, length=10)
-    print(sent)
-    print(analyzer.predict(sent))
+for pos_sent, sent in zip(pos_only, tagged):
+    pos_sent = utils.pad(pos_sent, padding_character=-1, length=10)
+    focus = query_analyzer.interpret_prediction(analyzer.predict(pos_sent), sent)
+
+    results = info_fetcher.fetch_results(str(focus))
+    print(results)
 
 # _scraper = scraper.Scraper()
 # print(_scraper.fetch_results('ice-cream'))
