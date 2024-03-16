@@ -1,34 +1,31 @@
 import utils
 
-class BigramMaker:
-    def __init__(self, words: list[str]) -> None:
+class Trigrams:
+    def __init__(self, words: list[utils.Word]):
         self.words = words
+        self.grams = {}
+        self.make_trigrams()
 
-        self.bigrams = utils.BigramsDict()
+        self.first = words[0].capitalize()
 
-    def fetch_bigrams(self):
-        for sentence in self.words:
-            # Using len-1 so that we don't run into an error when accessing element i+1
-            for i in range(len(sentence)-1):
-                curr = sentence[i].lower()
-                next_word = sentence[i+1]
-                if not self.bigrams.get(curr):
-                    # Initializing subdict
-                    self.bigrams[curr] = utils.BigramsDict()
+    def make_trigrams(self):
+        for prev2, prev, curr in zip(self.words[:-2], self.words[1:-1], self.words[2:]):
+            gram_prev2 = self.grams.get(prev2)
+            if gram_prev2 is None:
+                self.grams[prev2] = {}
+            
+            gram_prev = self.grams[prev2].get(prev)
+            if gram_prev is None:
+                self.grams[prev2][prev] = {}
 
-                if not self.bigrams.get(curr).get(next_word):
-                    self.bigrams[curr][next_word] = 0
+            gram_curr = self.grams[prev2][prev].get(curr)
+            if gram_curr is None:
+                self.grams[prev2][prev][curr] = 0
+            
+            self.grams[prev2][prev][curr] += 1
 
-                self.bigrams[curr][next_word] += 1
-        
-        return smooth(self.bigrams)
-    
-def smooth(bigrams: dict[str, dict[str, int]]) -> dict[str, dict[str, float]]:
-    for curr, next_words in bigrams.items():
-        total = sum(next_words.values())
-        smoothed_probs = utils.BigramsDict.from_dict({
-            word: count / total for word, count in next_words.items()
-        })
-        bigrams[curr] = smoothed_probs
-
-    return bigrams
+        for k, v in self.grams.items():
+            for k2, v2 in v.items():
+                v2_sum = sum(v2.values())
+                for k3, v3 in v2.items():
+                    self.grams[k][k2][k3] = v3/v2_sum

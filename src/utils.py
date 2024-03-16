@@ -2,6 +2,7 @@ import enum
 import random
 import toml
 import time
+import colorama
 
 class Project:
     def __init__(self) -> None:
@@ -119,98 +120,6 @@ STR_TO_POS = {
     'PUNC': POS.PUNCTUATION
 }
 
-class BigramsDict:
-    # Based off of a dict
-
-    @classmethod
-    def from_dict(cls, initializing_values: dict):
-        bigrams = cls()
-        bigrams.put_items(initializing_values, override=True)
-        return bigrams
-
-    def __init__(self) -> None:
-        self.__items = {}
-    
-    def items(self):
-        return self.__items.items()
-    
-    @property
-    def _items(self) -> list[tuple]:
-        return list(self.items())
-
-    def values(self):
-        return self.__items.values()
-    
-    @property
-    def _values(self) -> list:
-        return list(self.values())
-
-    def keys(self):
-        return self.__items.keys()
-
-    @property
-    def _keys(self):
-        return list(self.keys())
-
-    def fetch_map(self, key):
-        possibilities = [{obj.pos: val} for obj, val in self.items() if obj.word == key.word]
-        merged = {key: val for dic in possibilities for key, val in dic.items()}
-
-        return merged
-    
-    def __setitem__(self, __key, __value):
-        self.__items[__key] = __value
-
-    def __getitem__(self, __key):
-        if __key.pos == POS.ANY:
-            options = self.fetch_map(__key)
-            
-            # Guard clause
-            if not options:
-                raise KeyError("Cannot find word")
-
-            return options
-        
-        for current_key, val in self.items():
-            if current_key == __key:
-                return val
-            
-        raise KeyError("Cannot find word")
-    
-    def __contains__(self, __key: object) -> bool:
-        try:
-            self.__getitem__(__key)
-            return True
-        except KeyError:
-            return False
-
-    def get(self, __key: object, __default = None) -> object | None:
-        try:
-            value = self.__getitem__(__key)
-            return value
-        except KeyError:
-            return __default
-
-    def random_choice(self, **kwargs) -> tuple | object:
-        weight_values = kwargs.get('weight_values')
-        if weight_values:
-            # Use the values as weights
-            choices, weights = self._keys, self._values
-            return random.choices(choices, weights=weights, k=1)[0]
-
-        return random.choice(list(self.items()))
-
-    def __repr__(self) -> str:
-        # WOW!
-        return "BigramsDict{{{0}}}".format(', '.join(['{0}: {1}'.format(key, value) for key, value in self.items()]))
-
-    def put_items(self, vals: dict, **kwargs):
-        override = kwargs.get('override')
-        if override:
-            self.__items = vals
-        else:
-            self.__items.update(vals)
-
 def word_exists_in(word, target: dict):
     for key in target.keys():
         if word == key:
@@ -245,9 +154,6 @@ class WordShell:
     
     def lower(self):
         return WordShell(self.word.lower(), self.pos)
-    
-    def upper(self):
-        return WordShell(self.word.upper(), self.pos)
     
     def title(self):
         return WordShell(self.word.title(), self.pos)
@@ -297,6 +203,9 @@ class Word:
         if self.index == 0: return (None, self.sentence.word_only_list[self.index+1])
         if self.index == self.sentence.word_only_length - 1: return (self.sentence.word_only_list[self.index-1], None)
         return self.sentence.word_only_list[self.index-1], self.sentence.word_only_list[self.index+1]
+
+    def lower(self):
+        return self.word.lower()
 
     def __repr__(self) -> str:
         return self.word
@@ -369,10 +278,14 @@ class CompleteSentence(Exception):
     ...
 
 def make_words(words):
-    return [[Word(i, -1, -1) for i in sent] for sent in words]
+    if isinstance(words[0], list):
+        return [Word(i, -1, -1) for sent in words for i in sent]
+    return [Word(i, -1, -1) for i in words]
 
 def convert_tagged(tagged_words):
-    return [[WordShell(i.word, STR_TO_POS[pos]) for i, pos in sent] for sent in tagged_words]
+    if isinstance(tagged_words[0], list):
+        return [[WordShell(i.word, STR_TO_POS[pos]) for i, pos in words] for words in tagged_words]
+    return [WordShell(i.word, STR_TO_POS[pos]) for i, pos in tagged_words]
 
 def make_sentences(words: list[list[str]], tagger) -> Sentence:
     words = make_words(words)
@@ -441,3 +354,14 @@ def pad(tag_only, padding_character=-1, length=10):
     null_count = [padding_character] * (length-len(tag_only))
     return tag_only + null_count
 
+def grade(number):
+    number = round(number, 2)
+    color = colorama.Fore.RED if 0 <= number < 50 else (colorama.Fore.YELLOW if 50 <= number < 90 else colorama.Fore.GREEN)
+
+    return f'{color}{number}%{colorama.Style.RESET_ALL}'
+
+def flatten(items):
+    result = []
+    for sub in items:
+        result.extend(sub)
+    return result

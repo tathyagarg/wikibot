@@ -19,12 +19,9 @@ class RecurrentNeuralNetwork:
 
         if activation_deriv and not activation or activation and not activation_deriv:
             raise KeyError("Must include both activation and activation_deriv")
-        
-        self._truth = float('inf')
-        self.truth_magnitude = 1
 
         self.activation = activation or np.tanh
-        self.activation_derivative = activation_deriv or (lambda v: 1/np.cosh(v)**1/2) # d(tanhx)/dx = sech^2(x)
+        self.activation_derivative = activation_deriv or (lambda v: 1/np.cosh(v)**2) # d(tanhx)/dx = sech^2(x)
         self.output_activation = output_activation or (lambda v: np.round(10 * v))
         
         self.input_size = input_size
@@ -42,28 +39,13 @@ class RecurrentNeuralNetwork:
         self.hidden_state = None
         self.output_state = None
 
-    def set_properties(self, input_state, truth):
+    def set_properties(self, input_state):
         self.input_state = input_state
-        self.truth = truth
 
         self.hidden_state = self.activation(np.dot(self.input_state, self.W) + self.b)
         self.output_state = self.activation(np.dot(self.hidden_state, self.U) + self.c)
 
-    @property
-    def truth(self):
-        return self._truth
-    
-    @truth.setter
-    def truth(self, value):
-        if value == 0:
-            self.truth_magnitude = 1
-        else:
-            self.truth_magnitude = magnitude(value) + 1
-        self._truth = value / (10 ** self.truth_magnitude)
-
-    def backward_passes(self, *, inputs=None, epochs=5):
-        inputs = inputs or [(self.input_state, self.truth)]
-
+    def backward_passes(self, inputs, *, epochs=5):
         for _ in range(epochs):
             dW = np.zeros_like(self.W)
             dU = np.zeros_like(self.U)
@@ -101,17 +83,23 @@ class RecurrentNeuralNetwork:
 
         return self.output_activation(self.output_state)
 
+    def reset(self):
+        self.input_state = []
+
+        self.W = np.random.randn(self.input_size, self.hidden_size) * DAMPING  # Input -> hidden
+        self.V = np.random.randn(self.hidden_size, self.hidden_size) * DAMPING # Hidden -> hidden
+        self.U = np.random.randn(self.hidden_size, self.output_size) * DAMPING # Hidden -> output
+
+
+        self.b = np.random.randn(self.hidden_size)
+        self.c = np.random.randn(self.output_size)
+
+        self.hidden_state = None
+        self.output_state = None
+
     def train_on(self, dataset, *, epochs=EPOCHS, min_time=1.5, bar_length=100):
         for _ in utils.Bar(range(epochs), 'training epochs', 'Training complete.', min_time=min_time, length=bar_length):
             self.backward_passes(inputs=dataset)
-
-    def forward_pass(self):
-        if self.hidden_state == None:
-            self.hidden_state = np.dot(self.input_state, self.W) + self.b
-            self.output_state = np.dot(self.activation(self.hidden_state), self.U) + self.c
-        else:
-            self.hidden_state = np.dot(self.input_state, self.W) + np.dot(self.hidden_state, self.V) + self.b
-            self.output_state = np.dot(self.activation(self.hidden_state), self.U) + self.c
 
     def predict(self, inputs):
         self.input_state = inputs
@@ -132,9 +120,13 @@ class RecurrentNeuralNetwork:
         while accuracy < threshold:
             self.train_on(train_on, epochs=epochs, min_time=min_time, bar_length=bar_length)
             accuracy = self.test(test_on)
-            print(f"Accuracy: {accuracy*100:.2f}%")
+            print(f"Accuracy: {utils.grade(accuracy * 100)}")
             if accuracy < threshold:
-                print("Retraining.")
+                if accuracy >= 0.5:
+                    print("Continuing training")
+                else:
+                    print("Restarting training.")
+                    self.reset()
 
 def interpret_prediction(prediction, sentence):
     primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]

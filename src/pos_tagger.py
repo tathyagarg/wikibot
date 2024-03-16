@@ -75,21 +75,20 @@ class Tagger:
 
         prev, prev2 = self.START
         tokens = []
-        for words in corpus:
-            tokens.append([])
-            context = self.START + [self._normalize(w) for w in words] + self.END
-            for i, word in enumerate(words):
-                if word.word in string.punctuation:
-                    tokens[-1].append((word, "PUNC"))
-                    continue
 
-                tag = self.tagdict.get(word)
-                if not tag:
-                    features = self._get_features(i, word, context, prev, prev2)
-                    tag = self.model.predict(features)
-                tokens[-1].append((word, tag))
-                prev2 = prev
-                prev = tag
+        context = self.START + [w.word.lower() for w in corpus] + self.END
+        for i, word in enumerate(corpus):
+            if word.word in string.punctuation:
+                tokens.append((word, "PUNC"))
+                continue
+
+            tag = self.tagdict.get(word)
+            if not tag:
+                features = self._get_features(i, word, context, prev, prev2)
+                tag = self.model.predict(features)
+            tokens.append((word, tag))
+            prev2 = prev
+            prev = tag
         return tokens
 
     def load(self, loc):
@@ -103,16 +102,6 @@ class Tagger:
         self.model.weights, self.tagdict, self.classes = w_td_c
         self.model.classes = self.classes
         return None
-
-    def _normalize(self, word):
-        if '-' in word.word and word.word[0] != '-':
-            return '!HYPHEN'
-        elif word.shape == utils.WordShape.ONLY_DIGITS and len(word.word) == 4:
-            return '!YEAR'
-        elif word.shape == utils.WordShape.ONLY_DIGITS:
-            return '!DIGITS'
-        else:
-            return word.word.lower()
 
     def _get_features(self, i, word, context, prev, prev2):
         def add(name, *args):

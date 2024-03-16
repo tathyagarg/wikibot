@@ -1,22 +1,55 @@
 import random
-import utils
+import string
 
 class TextGenerator:
-    def __init__(self, bigrams: utils.BigramsDict) -> None:
-        self.bigrams = bigrams
+    def __init__(self, starting_word, trigrams) -> None:
+        self.starting_word = starting_word
+        self.trigrams = trigrams
 
-    def speak_from_word(self, start_on: utils.WordShell) -> str:
-        possibilities = self.bigrams.get(start_on)  # Safer than __getitem__
+    def fetch_second_word(self, prev):
+        weights = []
+        for v in self.trigrams[prev].values():
+            weights.append(sum(v.values()))
 
-        if not possibilities:
-            raise utils.CompleteSentence("Cannot think of further words.")
+        return random.choices(list(self.trigrams[prev].keys()), weights=weights)[0]
 
-        if start_on.pos == utils.POS.ANY:
-            # possibilities: dict[ utils.POS, BigramsDict[ WordShell, float ] ]
+    def speak_from_word(self, prev2=None, prev=None) -> str:
+        if prev2 is None and prev is None:
+            return self.starting_word
+        
+        if prev2 is None:
+            return self.fetch_second_word(prev)
+        
+        if prev not in self.trigrams.get(prev2, []) or prev2 not in self.trigrams:
+            return '', 1
+        
+        return random.choices(list(self.trigrams[prev2][prev].keys()), weights=list(self.trigrams[prev2][prev].values()))[0], 0
 
-            key: utils.POS = random.choice(list(possibilities.keys()))
 
-            # We can use __getitem__ instead of BigramsDict.get() because 'key' is guaranteed to be in the dict
-            return key, possibilities[key].random_choice(weight_values=True)
+    def speak_sentence(self):
+        result = []
+        prev2 = self.speak_from_word()  # prev2 from context of the 3rd word
+        prev = self.speak_from_word(None, prev2)  # prev from context of the 3rd word
+        result.append(prev2)
+        result.append(prev)
+        while True:
+            curr, status = self.speak_from_word(prev2, prev)
+            result.append(curr)
+            if status:
+                break
+            prev2, prev = prev, curr
 
-        return None, possibilities.random_choice(weight_values=True)
+        print(formatted(result))
+
+def formatted(text):
+    result = ''
+    for word in text:
+        if word in string.punctuation:
+            result = result[:-1]
+            result += word + ' '
+        elif word[0].isupper() and result:
+            result += '. ' + word + ' '
+        else:
+            result += word + ' '
+
+    return result + '.'

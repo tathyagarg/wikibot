@@ -2,6 +2,16 @@ import requests
 import bs4
 import utils
 
+def text_similarity(a, b):
+    if len(b) == 0: return len(a)
+    if len(a) == 0: return len(b)
+    if a[0] == b[0]: return text_similarity(a[1:], b[1:])
+    return 1 + min([
+        text_similarity(a[1:], b),
+        text_similarity(a, b[1:]),
+        text_similarity(a[1:], b[1:])
+    ])
+
 def columbia_encyclopedia(host_scheme, query, *, limit=1):
     def loose_search():
         url = f'{host_scheme.strip("/")}/search/encyclopedia/{"+".join(query.lower().split())}'
@@ -9,11 +19,17 @@ def columbia_encyclopedia(host_scheme, query, *, limit=1):
         iterator = iter(soup.find_all('article', class_='contextual-region'))
         for _ in range(limit):
             a = next(iterator).h2.a
-            yield a['href']
+            if text_similarity(a.text, query) < 5:
+                yield a['href']
+            else:
+                return []
 
-    for href in loose_search():
-        url = f'{host_scheme.strip("/")}/{href.strip("/")}'
-        yield bs4.BeautifulSoup(requests.get(url).text, 'html.parser').find_all('div', class_='article-detail')[0].div.p.text.strip()
+    try:
+        for href in loose_search():
+            url = f'{host_scheme.strip("/")}/{href.strip("/")}'
+            yield bs4.BeautifulSoup(requests.get(url).text, 'html.parser').find_all('div', class_='article-detail')[0].div.p.text.strip()
+    except RuntimeError:
+        return []
 
 def wikipedia(host_scheme, query, *, limit=1):
     def empty_filter(content):
@@ -56,9 +72,15 @@ class Scraper:
         self.scrapers = scrapers or [ScrapeSite('https://www.infoplease.com', columbia_encyclopedia), ScrapeSite('https://en.wikipedia.org', wikipedia)]        
 
     def fetch_results(self, query, *, limit=1):
-        results = []
-        for scraper_idx in utils.Bar(range(len(self.scrapers)), 'sites searched', 'Searching complete.'):
-            for result in self.scrapers[scraper_idx].fetch(query, limit=limit):
-                results.append(result)
+        while True:
+            try:
+                results = []
+                for scraper_idx in utils.Bar(range(len(self.scrapers)), 'sites searched', 'Searching complete.'):
+                    for result in self.scrapers[scraper_idx].fetch(query, limit=limit):
+                        results.append(result)
 
-        return results
+                return results
+            except KeyboardInterrupt:
+                if not input("\nDon't enter anything to continue: "):
+                    continue
+                return
