@@ -30,7 +30,7 @@ PROJECT.PARENT_DIRECTORY = pathlib.Path(__file__).parent.parent
 with open(f'{PROJECT.PARENT_DIRECTORY}/config.toml') as f:
     data = toml.load(f)
 
-    PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'] = data['pos-tagger']['PERCEPTRON_PICKLE']
+    PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'] = f"{PROJECT.PARENT_DIRECTORY}/data/{data['pos-tagger']['PERCEPTRON_PICKLE']}"
     
     PROJECT.QUERY_ANALYZER['DAMPING'] = data['query-analyzer']['DAMPING']
     PROJECT.QUERY_ANALYZER['ALPHA'] = data['query-analyzer']['ALPHA']

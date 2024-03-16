@@ -3,7 +3,7 @@ HASH_CHARACTER = "■"
 SPACE_CHARACTER = " "
 
 [pos-tagger]
-PERCEPTRON_PICKLE = "../data/trontagger-0.1.0.pickle"
+PERCEPTRON_PICKLE = "trontagger-0.1.0.pickle"
 
 [query-analyzer]
 DAMPING = 0.01
