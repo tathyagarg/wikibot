@@ -33,4 +33,3 @@ DATA = list(map(
     lambda items: (utils.pad(items[0]),items[1]), 
     DATA
 ))
-

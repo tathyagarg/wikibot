@@ -1,8 +1,8 @@
 import enum
-import random
 import toml
 import time
 import colorama
+import pathlib
 
 class Project:
     def __init__(self) -> None:
@@ -22,18 +22,14 @@ class Project:
             "SPACE_CHARACTER": None
         }
 
-        self.data = [self.POS_TAGGER, self.QUERY_ANALYZER, self.UTILS]
+        self.PARENT_DIRECTORY = None
 
-    @property
-    def initialized(self):
-        for data in self.data:
-            if not all(list(data.values())): return False
-        return True
+PROJECT = Project()
+PROJECT.PARENT_DIRECTORY = pathlib.Path(__file__).parent.parent
 
-with open(f'./config.toml') as f:
+with open(f'{PROJECT.PARENT_DIRECTORY}/config.toml') as f:
     data = toml.load(f)
 
-    PROJECT = Project()
     PROJECT.POS_TAGGER['PERCEPTRON_PICKLE'] = data['pos-tagger']['PERCEPTRON_PICKLE']
     
     PROJECT.QUERY_ANALYZER['DAMPING'] = data['query-analyzer']['DAMPING']
@@ -90,8 +86,7 @@ class WordShape(enum.Enum):
 
 class TokenizeType(enum.Enum):
     WORD = 0
-    PUNC_SENT = 1
-    WORD_SENT = 2
+    WORD_SENT = 1
 
 STR_TO_POS = {
     'CC': POS.CONJUNCTION,
